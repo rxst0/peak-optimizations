@@ -1398,7 +1398,9 @@ $xamlText = @'
             </WrapPanel>
             <TextBlock Style="{StaticResource H}" Text="Quick Actions" Margin="0,8,0,8"/>
             <WrapPanel>
-              <Button x:Name="BtnQuickRestore" Content="Create Restore Point" Style="{StaticResource AccentButton}"/>
+              <Button x:Name="BtnBoost" Content="Boost Performance" Style="{StaticResource AccentButton}" FontSize="14" Padding="20,9"
+                      ToolTip="Clears temporary files, browser caches, old crash reports, leftover update downloads and the DNS cache. Your files, passwords and logins are not touched."/>
+              <Button x:Name="BtnQuickRestore" Content="Create Restore Point"/>
               <Button x:Name="BtnQuickBackground" Content="End Background Apps"/>
               <Button x:Name="BtnQuickTemp" Content="Clean Temp Files"/>
               <Button x:Name="BtnQuickExplorer" Content="Restart Explorer"/>
@@ -2326,6 +2328,76 @@ $ui.BtnImport.Add_Click({
 
 # Home
 $ui.BtnQuickRestore.Add_Click({ Start-Tweaks @($TweakMap['RestorePoint']) $false })
+
+# Boost Performance: clears caches that apps and Windows rebuild on their own. Never touches personal files,
+# browser history, passwords, cookies or logins.
+$BoostScript = {
+    function Get-FolderSize([string]$Path) {
+        if (-not (Test-Path -LiteralPath $Path)) { return 0 }
+        [double](Get-ChildItem -LiteralPath $Path -Recurse -Force -File -ErrorAction SilentlyContinue | Measure-Object Length -Sum).Sum
+    }
+    # Empties a folder (keeps the folder itself). Files in use are skipped. Returns bytes freed.
+    function Clear-Folder([string]$Path) {
+        if (-not (Test-Path -LiteralPath $Path)) { return 0 }
+        $before = Get-FolderSize $Path
+        Get-ChildItem -LiteralPath $Path -Force -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+        [math]::Max(0, $before - (Get-FolderSize $Path))
+    }
+    function Write-Freed([string]$What, [double]$Bytes) { Write-Log ('  {0}: {1:N1} MB freed' -f $What, ($Bytes / 1MB)) }
+
+    $total = 0.0
+    $freed = (Clear-Folder $env:TEMP) + (Clear-Folder "$env:SystemRoot\Temp")
+    Write-Freed 'Temporary files' $freed; $total += $freed
+
+    $freed = 0.0
+    foreach ($p in "$env:ProgramData\Microsoft\Windows\WER\ReportArchive", "$env:ProgramData\Microsoft\Windows\WER\ReportQueue", "$env:LOCALAPPDATA\CrashDumps") { $freed += Clear-Folder $p }
+    Write-Freed 'Old crash reports' $freed; $total += $freed
+
+    # Browser caches only (cached pages and images). History, passwords, cookies and logins live elsewhere and are kept.
+    $browsers = @(
+        @{ Name = 'Microsoft Edge'; Process = 'msedge'; Root = "$env:LOCALAPPDATA\Microsoft\Edge\User Data" }
+        @{ Name = 'Google Chrome'; Process = 'chrome'; Root = "$env:LOCALAPPDATA\Google\Chrome\User Data" }
+        @{ Name = 'Brave'; Process = 'brave'; Root = "$env:LOCALAPPDATA\BraveSoftware\Brave-Browser\User Data" }
+    )
+    foreach ($b in $browsers) {
+        if (-not (Test-Path -LiteralPath $b.Root)) { continue }
+        if (Get-Process -Name $b.Process -ErrorAction SilentlyContinue) { Write-Log "  $($b.Name) is open - close it and run Boost again to clear its cache."; continue }
+        $freed = 0.0
+        foreach ($browserProfile in Get-ChildItem -LiteralPath $b.Root -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -eq 'Default' -or $_.Name -like 'Profile *' }) {
+            foreach ($c in 'Cache', 'Code Cache', 'GPUCache') { $freed += Clear-Folder (Join-Path $browserProfile.FullName $c) }
+        }
+        Write-Freed "$($b.Name) cache" $freed; $total += $freed
+    }
+    $ff = "$env:LOCALAPPDATA\Mozilla\Firefox\Profiles"
+    if (Test-Path -LiteralPath $ff) {
+        if (Get-Process -Name firefox -ErrorAction SilentlyContinue) { Write-Log '  Firefox is open - close it and run Boost again to clear its cache.' }
+        else {
+            $freed = 0.0
+            foreach ($browserProfile in Get-ChildItem -LiteralPath $ff -Directory -ErrorAction SilentlyContinue) { $freed += Clear-Folder (Join-Path $browserProfile.FullName 'cache2') }
+            Write-Freed 'Firefox cache' $freed; $total += $freed
+        }
+    }
+
+    # Windows Update downloads that are already installed, and the cache used to share updates with other PCs.
+    $wu = "$env:SystemRoot\SoftwareDistribution\Download"
+    $wasRunning = (Get-Service wuauserv -ErrorAction SilentlyContinue).Status -eq 'Running'
+    Stop-Service wuauserv -Force -ErrorAction SilentlyContinue
+    $freed = Clear-Folder $wu
+    if ($wasRunning) { Start-Service wuauserv -ErrorAction SilentlyContinue }
+    try { Delete-DeliveryOptimizationCache -Force -ErrorAction Stop } catch { }
+    Write-Freed 'Old Windows Update downloads' $freed; $total += $freed
+
+    Clear-DnsClientCache -ErrorAction SilentlyContinue
+    Write-Log '  DNS cache cleared'
+    Write-Log ('Boost complete - {0:N0} MB freed in total.' -f ($total / 1MB))
+}
+
+$ui.BtnBoost.Add_Click({
+    $ok = [System.Windows.MessageBox]::Show(
+        "Boost Performance will clear:`n`n  - Temporary files`n  - Browser caches (Edge, Chrome, Brave, Firefox)`n  - Old crash reports`n  - Leftover Windows Update downloads`n  - The DNS cache`n`nYour files, browser history, passwords and logins are not touched. Close your browsers first to clear their caches too.`n`nContinue?",
+        $AppName, 'YesNo', 'Question')
+    if ($ok -eq 'Yes') { Start-PeakJob -Title 'Boost Performance' -Script $BoostScript }
+})
 $ui.BtnQuickTemp.Add_Click({ Start-Tweaks @($TweakMap['TempFiles']) $false })
 $restartExplorer = { Stop-Process -Name explorer -Force -ErrorAction SilentlyContinue; Write-Log 'Explorer restarted.' }
 $ui.BtnQuickExplorer.Add_Click($restartExplorer)
