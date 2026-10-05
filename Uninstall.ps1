@@ -41,6 +41,11 @@ Get-CimInstance Win32_Process -Filter "Name = 'powershell.exe'" -ErrorAction Sil
     Where-Object { $_.CommandLine -match 'PeakOptimizations\.ps1' -and $_.ProcessId -ne $PID } |
     ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
 
+# Remove the auto-clean scheduled task (and its folder) if it was turned on.
+if (-not $SandboxRoot) {
+    Unregister-ScheduledTask -TaskName 'Peak Optimizations Auto-Clean' -TaskPath '\Peak Optimizations\' -Confirm:$false -ErrorAction SilentlyContinue
+    try { $svc = New-Object -ComObject Schedule.Service; $svc.Connect(); $svc.GetFolder('\').DeleteFolder('Peak Optimizations', 0); Write-Host '  - Removed auto-clean scheduled task' } catch { }
+}
 foreach ($l in $links) { if (Test-Path -LiteralPath $l) { Remove-Item -LiteralPath $l -Force; Write-Host "  - Removed shortcut $l" } }
 if (Test-Path $uninstallKey) { Remove-Item -Path $uninstallKey -Recurse -Force; Write-Host '  - Removed from Settings > Apps' }
 Set-Location $env:TEMP   # so the program folder isn't in use

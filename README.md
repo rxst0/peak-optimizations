@@ -1,7 +1,7 @@
 # Peak Optimizations
 
 A lightweight Windows 10/11 optimization utility inspired by Chris Titus Tech's WinUtil.
-One PowerShell file (~225 KB) plus a tiny installer, no dependencies — it uses the PowerShell 5.1 + WPF that ship with Windows.
+One PowerShell file (~241 KB) plus a tiny installer, no dependencies — it uses the PowerShell 5.1 + WPF that ship with Windows.
 
 ## Install
 
@@ -19,7 +19,7 @@ Running the installer again updates it; your settings, tweak backups and macros 
 | Tab | What it does |
 |---|---|
 | **Home** | System overview (OS, CPU, GPU, RAM, disk, uptime, power plan) and quick actions |
-| **Background** | Shows apps running in the background without a window and how much memory each uses, with safe ones (updaters, Edge background mode, Phone Link, Widgets, Teams...) pre-selected — **End Selected** closes them. Windows, security, anti-cheat and driver processes are never listed. Also a **Start with Windows** list to stop apps launching at sign-in (same switch as Task Manager, reversible) |
+| **Background** | Shows apps running in the background without a window and how much memory each uses, with safe ones pre-selected — **End Selected** closes them. Also finds closed apps Windows keeps **frozen in memory doing nothing** (suspended). **Auto-end useless background tasks** does it for you every 5–60 minutes, optionally even while the app is closed (a hidden scheduled task that runs a quick clean and exits). Windows itself, apps you have open, security, anti-cheat and drivers are never touched. Plus a **Start with Windows** list to stop apps launching at sign-in (same switch as Task Manager) |
 | **Install** | ~70 curated apps via `winget`: install/upgrade, uninstall, upgrade all, detect installed, search |
 | **Tweaks** | 13 essential, 9 competitive and 16 advanced tweaks, Standard / Minimal / Gaming presets, **Undo Selected**, 16 instant preference toggles. Competitive tweaks are **core-isolation safe**: they never turn off Memory Integrity, VBS, CPU mitigations, DEP or Defender, so anti-cheats like Vanguard and FACEIT keep working |
 | **Games** | **Competitive / Max FPS / Balanced** presets for **Fortnite, Rust and Rainbow Six Siege** (e.g. Siege Competitive keeps shadows on High so you see enemy shadows). Edits each game's own settings file, sets Windows to use the high-performance GPU, and backs everything up so **Restore Original** puts it back. Resolution, sensitivity, keybinds and FPS cap are never changed |

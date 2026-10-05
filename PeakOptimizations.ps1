@@ -8,17 +8,20 @@
 #>
 param(
     # Builds the whole UI and exits without showing it (used to validate the script).
-    [switch]$SelfTest
+    [switch]$SelfTest,
+    # Scheduled auto-clean run: end the auto-clean list and exit, no window. Add -DryRun to only log what would be ended.
+    [switch]$AutoClean,
+    [switch]$DryRun
 )
 
 #region Bootstrap ---------------------------------------------------------------
 $AppName = 'Peak Optimizations'
-$AppVersion = '1.4.0'
+$AppVersion = '1.5.0'
 
 $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(
     [Security.Principal.WindowsBuiltInRole]::Administrator)
 
-if (-not $SelfTest -and (-not $isAdmin -or [Threading.Thread]::CurrentThread.ApartmentState -ne 'STA')) {
+if (-not $SelfTest -and -not $AutoClean -and (-not $isAdmin -or [Threading.Thread]::CurrentThread.ApartmentState -ne 'STA')) {
     # Relaunch elevated in Windows PowerShell 5.1 (STA, needed for WPF and Checkpoint-Computer).
     $argList = "-NoProfile -ExecutionPolicy Bypass -STA -WindowStyle Hidden -File `"$PSCommandPath`""
     try { Start-Process -FilePath "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -ArgumentList $argList -Verb RunAs }
@@ -216,6 +219,300 @@ $Helpers = {
 }
 . $Helpers
 #endregion
+
+#region Background tasks (used by the Background tab and by the -AutoClean scheduled run) --------
+# 'process|label|level|note'
+#   level 0 = listed but never pre-selected, 1 = safe to end (pre-selected),
+#   2 = safe to end and on the default auto-clean list (things that do nothing useful while you're not using them).
+$BgKnown = @{}
+@(
+    'msedge|Microsoft Edge (background)|1|Edge keeps running after you close it (Startup boost).'
+    'MicrosoftEdgeUpdate|Edge updater|2|Checks for Edge updates.'
+    'GoogleUpdate|Google updater|2|Checks for Chrome/Google updates.'
+    'GoogleCrashHandler|Google crash reporter|2|Sends Google crash reports.'
+    'GoogleCrashHandler64|Google crash reporter|2|Sends Google crash reports.'
+    'OneDrive|OneDrive|1|Cloud sync pauses until you open OneDrive again.'
+    'PhoneExperienceHost|Phone Link|1|Phone notifications on the PC stop until you open it.'
+    'YourPhone|Phone Link|1|Phone notifications on the PC stop until you open it.'
+    'Widgets|Windows Widgets|2|Reopens when you open the Widgets board.'
+    'WidgetService|Windows Widgets|2|Reopens when you open the Widgets board.'
+    'MicrosoftStartFeedProvider|Windows Widgets|2|Reopens when you open the Widgets board.'
+    'ms-teams|Microsoft Teams|1|Teams notifications stop until you open it.'
+    'MSTeams|Microsoft Teams|1|Teams notifications stop until you open it.'
+    'Teams|Microsoft Teams|1|Teams notifications stop until you open it.'
+    'Skype|Skype|1|Skype notifications stop until you open it.'
+    'Copilot|Microsoft Copilot|2|Reopens when you use Copilot.'
+    'Cortana|Cortana|2|Reopens when you use Cortana.'
+    'GameBar|Xbox Game Bar|2|Reopens when you press Win+G.'
+    'GameBarFTServer|Xbox Game Bar helper|2|Reopens when you press Win+G.'
+    'XboxPcTray|Xbox app tray icon|1|Only the tray icon closes; the Xbox app still works.'
+    'AdobeARM|Adobe updater|2|Checks for Adobe Reader updates.'
+    'AcrobatNotificationClient|Adobe Acrobat notifications|2|Adobe pop-ups.'
+    'AdobeCollabSync|Adobe Acrobat sync|1|Adobe document sync.'
+    'CCXProcess|Adobe Creative Cloud helper|2|Starts again with Creative Cloud apps.'
+    'CoreSync|Adobe file sync|1|Starts again with Creative Cloud.'
+    'Adobe Desktop Service|Adobe Creative Cloud service|1|Starts again with Creative Cloud apps.'
+    'AdobeIPCBroker|Adobe helper|1|Starts again with Adobe apps.'
+    'jusched|Java updater|2|Checks for Java updates.'
+    'CCleaner64|CCleaner monitoring|2|Background monitoring and pop-ups.'
+    'iTunesHelper|iTunes helper|2|Starts iTunes when an iPhone is plugged in.'
+    'SpotifyWebHelper|Spotify web helper|2|Not needed for Spotify to play.'
+    'lghub_updater|Logitech G HUB updater|2|Checks for G HUB updates.'
+    'Steam|Steam|0|Needed to play Steam games (Rust, Siege on Steam).'
+    'steamwebhelper|Steam|0|Part of Steam.'
+    'EpicGamesLauncher|Epic Games Launcher|0|Needed to play Epic games (Fortnite).'
+    'EpicWebHelper|Epic Games Launcher|0|Needed to play Epic games (Fortnite).'
+    'EpicOnlineServicesUserHelper|Epic Games Launcher|0|Needed to play Epic games (Fortnite).'
+    'EOSOverlayRenderer-Win64-Shipping|Epic Games Launcher|0|Needed to play Epic games (Fortnite).'
+    'MedalEncoder|Medal.tv|0|Clip recording stops.'
+    'StreamDeck|Elgato Stream Deck|0|Stream Deck buttons stop working.'
+    'wallpaper32|Wallpaper Engine|0|Animated wallpaper stops (it already pauses itself during games).'
+    'wallpaper64|Wallpaper Engine|0|Animated wallpaper stops (it already pauses itself during games).'
+    'NVIDIA Share|NVIDIA overlay|0|ShadowPlay recording and the Alt+Z overlay stop.'
+    'nvsphelper64|NVIDIA overlay|0|ShadowPlay recording and the Alt+Z overlay stop.'
+    'upc|Ubisoft Connect|0|Needed to play Ubisoft games (Siege).'
+    'UbisoftConnect|Ubisoft Connect|0|Needed to play Ubisoft games (Siege).'
+    'EADesktop|EA app|0|Needed to play EA games.'
+    'Battle.net|Battle.net|0|Needed to play Blizzard games.'
+    'RiotClientServices|Riot Client|0|Needed to play Riot games.'
+    'GalaxyClient|GOG Galaxy|0|Needed to play GOG games through Galaxy.'
+    'Discord|Discord|0|Voice chat and messages stop.'
+    'Spotify|Spotify|0|Music stops.'
+    'Dropbox|Dropbox|0|Cloud sync pauses.'
+    'GoogleDriveFS|Google Drive|0|Cloud sync pauses.'
+    'Overwolf|Overwolf|0|Game add-ons stop.'
+    'Medal|Medal.tv|0|Clip recording stops.'
+    'iCUE|Corsair iCUE|0|RGB lighting, DPI profiles and macros from iCUE stop.'
+    'lghub|Logitech G HUB|0|Lighting, DPI profiles and macros from G HUB stop.'
+    'lghub_agent|Logitech G HUB|0|Lighting, DPI profiles and macros from G HUB stop.'
+    'RazerAppEngine|Razer Synapse|0|Lighting, DPI profiles and macros from Synapse stop.'
+    'SteelSeriesGG|SteelSeries GG|0|Lighting and device profiles stop.'
+    'SteelSeriesEngine|SteelSeries Engine|0|Lighting and device profiles stop.'
+    'ArmouryCrate|ASUS Armoury Crate|0|Lighting and fan profiles stop.'
+    'ArmourySocketServer|ASUS Armoury Crate|0|Lighting and fan profiles stop.'
+    'ArmouryCrate.UserSessionHelper|ASUS Armoury Crate|0|Lighting and fan profiles stop.'
+    'ArmourySwAgent|ASUS Armoury Crate|0|Lighting and fan profiles stop.'
+    'SignalRgb|SignalRGB|0|RGB lighting stops.'
+    'RadeonSoftware|AMD Software (Adrenalin)|0|Overlay and hotkeys stop; the graphics driver keeps working.'
+    'MSIAfterburner|MSI Afterburner|0|GPU overclock/fan curve and overlay stop.'
+    'RTSS|RivaTuner Statistics Server|0|FPS limiter and overlay stop.'
+) | ForEach-Object {
+    $p = $_ -split '\|'
+    $BgKnown[$p[0]] = @{ Label = $p[1]; End = [int]$p[2] -ge 1; Auto = [int]$p[2] -ge 2; Note = $p[3] }
+}
+# Never listed: Windows shell and core processes, security, anti-cheat and hardware-driver helpers.
+$BgNever = '^(explorer|dwm|csrss|winlogon|lsass|services|smss|wininit|fontdrvhost|sihost|ctfmon|RuntimeBroker|ShellExperienceHost|' +
+    'StartMenuExperienceHost|SearchHost|SearchApp|TextInputHost|SecurityHealth.*|audiodg|conhost|dllhost|taskhostw|ApplicationFrameHost|' +
+    'LockApp|smartscreen|WmiPrvSE|svchost|msedgewebview2|powershell|pwsh|WindowsTerminal|OpenConsole|cmd|' +
+    'vgc|vgtray|EasyAntiCheat.*|BEService.*|BEDaisy|FACEIT.*|faceit.*|EAAntiCheat.*|PnkBstr.*|mbam.*|MBAM.*|MsMpEng|NisSrv|' +
+    'avp|avast.*|AvastUI|avg.*|ekrn|egui|bdagent|vsserv|NortonSecurity|' +
+    'NVDisplay\.Container|nvcontainer|atiesrxx|atieclxx|amdfendr.*|AMDRS.*|amdow|RtkAud.*|RtkNGUI.*|Realtek.*|Nahimic.*|A3DUtility|Waves.*|' +
+    'igfx.*|IntelCpHDCPSvc|jhi_service|LMS|esif_.*|SynTP.*|ETDCtrl|Wacom.*|WTablet.*)$'
+
+# Which processes own a window you can see or get back to - including minimized windows, windows on other virtual
+# desktops and the inside of Store-app frames. Store apps that are suspended with no such window are closed apps that
+# Windows kept in memory: they are frozen and do nothing.
+$WindowScanSource = @'
+using System;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
+using System.Text;
+namespace Peak
+{
+    public static class WindowScan
+    {
+        delegate bool EnumProc(IntPtr hwnd, IntPtr lParam);
+        [DllImport("user32.dll")] static extern bool EnumWindows(EnumProc cb, IntPtr lParam);
+        [DllImport("user32.dll")] static extern bool EnumChildWindows(IntPtr parent, EnumProc cb, IntPtr lParam);
+        [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr hwnd);
+        [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint pid);
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetClassName(IntPtr hwnd, StringBuilder name, int max);
+        [DllImport("dwmapi.dll")] static extern int DwmGetWindowAttribute(IntPtr hwnd, int attribute, out int value, int size);
+
+        public static int[] WindowOwners()
+        {
+            var pids = new HashSet<int>();
+            EnumWindows(delegate (IntPtr h, IntPtr l)
+            {
+                if (!IsWindowVisible(h)) return true;
+                int cloaked;
+                // Cloaked by the app itself = hidden (e.g. a closed Store app kept in memory). Cloaked by the shell = another virtual desktop.
+                if (DwmGetWindowAttribute(h, 14, out cloaked, 4) == 0 && (cloaked & 1) != 0) return true;
+                uint pid;
+                GetWindowThreadProcessId(h, out pid);
+                pids.Add((int)pid);
+                var cls = new StringBuilder(64);
+                GetClassName(h, cls, 64);
+                if (cls.ToString() == "ApplicationFrameWindow")
+                    EnumChildWindows(h, delegate (IntPtr c, IntPtr l2) { uint cp; GetWindowThreadProcessId(c, out cp); pids.Add((int)cp); return true; }, IntPtr.Zero);
+                return true;
+            }, IntPtr.Zero);
+            var result = new int[pids.Count];
+            pids.CopyTo(result);
+            return result;
+        }
+    }
+}
+'@
+
+function Get-WindowOwnerPids {
+    try {
+        if (-not ('Peak.WindowScan' -as [type])) { Add-Type -TypeDefinition $WindowScanSource -ErrorAction Stop }
+        $set = New-Object 'System.Collections.Generic.HashSet[int]'
+        foreach ($p in [Peak.WindowScan]::WindowOwners()) { [void]$set.Add($p) }
+        , $set   # comma: return the set itself, not its items
+    } catch { $null }   # without it, suspended apps are simply not offered
+}
+
+function Test-Suspended($Processes) {
+    foreach ($p in $Processes) {
+        try {
+            $threads = $p.Threads
+            if (-not $threads.Count) { return $false }
+            foreach ($t in $threads) { if ("$($t.ThreadState)" -ne 'Wait' -or "$($t.WaitReason)" -ne 'Suspended') { return $false } }
+        } catch { return $false }
+    }
+    $true
+}
+
+function Get-BackgroundApps {
+    $session = (Get-Process -Id $PID).SessionId
+    $all = @(Get-Process | Where-Object { $_.SessionId -eq $session })
+    $byId = @{}
+    foreach ($p in $all) { $byId[$p.Id] = $p }
+    $windowed = @{}
+    foreach ($p in $all) { if ($p.MainWindowHandle -ne [IntPtr]::Zero) { $windowed[$p.Name] = $true } }
+    $owners = Get-WindowOwnerPids
+    $parentOf = @{}
+    foreach ($w in Get-CimInstance Win32_Process -Filter "SessionId = $session" -Property ProcessId, ParentProcessId -ErrorAction SilentlyContinue) { $parentOf[[int]$w.ProcessId] = [int]$w.ParentProcessId }
+    $entries = [ordered]@{}
+    foreach ($g in $all | Where-Object { $_.Id -ne $PID } | Group-Object Name) {
+        $name = $g.Name
+        if ($name -match $BgNever -or $windowed[$name]) { continue }   # Windows core/protected, or an app you have open
+        $known = $BgKnown[$name]
+        $suspended = $null -ne $owners -and -not @($g.Group | Where-Object { $owners.Contains($_.Id) }).Count -and (Test-Suspended $g.Group)
+        if (-not $suspended) {
+            # Helpers of an app you have open (e.g. a code editor's background workers) are left alone.
+            $helper = @($g.Group | Where-Object { $pp = $byId[$parentOf[$_.Id]]; $pp -and ($windowed[$pp.Name] -or $pp.Id -eq $PID) })
+            if ($helper.Count -eq $g.Count) { continue }
+        }
+        $path = ($g.Group | Where-Object Path | Select-Object -First 1).Path
+        if (-not $known -and -not $suspended -and $path -and $path.StartsWith($env:SystemRoot, [StringComparison]::OrdinalIgnoreCase)) { continue }
+        $desc = if ($known) { $known.Label } else { ($g.Group | Where-Object Description | Select-Object -First 1).Description }
+        if (-not $desc) { $desc = $name }
+        $parents = @($g.Group | ForEach-Object { $pp = $byId[$parentOf[$_.Id]]; if ($pp -and $pp.Name -ne $name) { $pp.Name } } | Select-Object -Unique)
+        $entries[$name] = [pscustomobject]@{
+            Name        = $name
+            Names       = @($name)
+            Label       = if ($suspended -and -not $known) { "$desc (suspended)" } else { $desc }
+            Note        = if ($suspended -and -not $known) { 'Closed, but Windows kept it frozen in memory. It does nothing and opens normally next time.' }
+                          elseif ($known) { $known.Note }
+                          elseif ($parents -and $parents -notcontains 'explorer') { "Helper started by $(($parents | ForEach-Object { "$_.exe" }) -join ', ')" }
+                          elseif ($path) { $path } else { "$name.exe" }
+            Recommended = [bool](($known -and $known.End) -or ($suspended -and -not $known))
+            Known       = [bool]$known
+            Suspended   = [bool]$suspended
+            MB          = [math]::Round(($g.Group | Measure-Object WorkingSet64 -Sum).Sum / 1MB)
+            Ids         = @($g.Group.Id)
+            Parent      = if ($parents.Count -eq 1) { $parents[0] } else { $null }
+        }
+    }
+    # Unknown helper processes are folded into the app that started them...
+    foreach ($key in @($entries.Keys)) {
+        $e = $entries[$key]
+        if ($e.Known -or $e.Suspended -or -not $e.Parent -or -not $entries.Contains($e.Parent)) { continue }
+        $owner = $entries[$e.Parent]
+        $owner.MB += $e.MB; $owner.Ids += $e.Ids; $owner.Names += $e.Names
+        $entries.Remove($key)
+    }
+    # ...and known apps made of several processes (e.g. Epic, Medal) show as one entry.
+    foreach ($grp in $entries.Values | Group-Object Label) {
+        if ($grp.Count -eq 1 -or -not $grp.Group[0].Known) { $grp.Group; continue }
+        $first = $grp.Group[0]
+        $first.MB = ($grp.Group | Measure-Object MB -Sum).Sum
+        $first.Ids = @($grp.Group | ForEach-Object { $_.Ids })
+        $first.Names = @($grp.Group | ForEach-Object { $_.Names })
+        $first.Recommended = -not @($grp.Group | Where-Object { -not $_.Recommended })
+        $first
+    }
+}
+
+function Stop-BackgroundApps([object[]]$Apps) {
+    $freed = 0
+    foreach ($a in $Apps) {
+        $failed = 0
+        foreach ($id in $a.Ids) { try { Stop-Process -Id $id -Force -ErrorAction Stop } catch { if (Get-Process -Id $id -ErrorAction SilentlyContinue) { $failed++ } } }
+        if ($failed) { Write-Log "  $($a.Label): $failed process(es) could not be ended." 'WARN' } else { Write-Log "  Ended $($a.Label) ($($a.MB) MB)"; $freed += $a.MB }
+    }
+    Write-Log ('Freed about {0:N0} MB of memory.' -f $freed)
+}
+
+# ---------- Auto-clean ----------
+$AutoCleanFile = Join-Path $DataDir 'autoclean.json'
+$AutoCleanTaskName = 'Peak Optimizations Auto-Clean'
+$AutoCleanTaskPath = '\Peak Optimizations\'
+$AutoCleanDefaults = @($BgKnown.Keys | Where-Object { $BgKnown[$_].Auto } | Sort-Object)
+
+function Get-AutoCleanConfig {
+    $c = [ordered]@{ Enabled = $false; Minutes = 15; WhenClosed = $false; Suspended = $true; Names = $AutoCleanDefaults }
+    if (Test-Path $AutoCleanFile) {
+        try {
+            $saved = Get-Content $AutoCleanFile -Raw | ConvertFrom-Json
+            foreach ($k in @($c.Keys)) { if ($null -ne $saved.$k) { $c[$k] = $saved.$k } }
+        } catch { }
+    }
+    $c.Enabled = [bool]$c.Enabled; $c.WhenClosed = [bool]$c.WhenClosed; $c.Suspended = [bool]$c.Suspended
+    $c.Minutes = [math]::Min([math]::Max(5, [int]$c.Minutes), 1440)
+    $c.Names = @($c.Names | ForEach-Object { [string]$_ } | Where-Object { $_ -and $_ -notmatch $BgNever } | Select-Object -Unique)
+    $c
+}
+
+function Save-AutoCleanConfig($C) { $C | ConvertTo-Json | Set-Content -Path $AutoCleanFile -Encoding UTF8 }
+
+function Get-AutoCleanTargets($C) {
+    @(Get-BackgroundApps | Where-Object { ($C.Suspended -and $_.Suspended) -or @($_.Names | Where-Object { $C.Names -contains $_ }).Count })
+}
+
+# Ends whatever is on the auto-clean list right now. Logs only when something was ended.
+function Invoke-AutoClean([switch]$DryRun) {
+    $targets = Get-AutoCleanTargets (Get-AutoCleanConfig)
+    if (-not $targets) { return @() }
+    if ($DryRun) { Write-Log "Auto-clean would end: $(($targets | ForEach-Object { "$($_.Label) ($($_.MB) MB)" }) -join ', ')"; return $targets }
+    Write-Log "Auto-clean: ending $($targets.Count) useless background task(s)"
+    Stop-BackgroundApps $targets
+    $targets
+}
+
+# A hidden scheduled task runs "-AutoClean" at sign-in and then on the chosen interval, so cleaning continues while the
+# app is closed. Each run takes a moment and exits; nothing stays running.
+function Set-AutoCleanTask([bool]$On, [int]$Minutes) {
+    Unregister-ScheduledTask -TaskName $AutoCleanTaskName -TaskPath $AutoCleanTaskPath -Confirm:$false -ErrorAction SilentlyContinue
+    if (-not $On) { return }
+    $exe = Join-Path $PSScriptRoot 'Peak Optimizations.exe'
+    $action = if (Test-Path $exe) { New-ScheduledTaskAction -Execute $exe -Argument '-AutoClean' -WorkingDirectory $PSScriptRoot }
+    else {
+        # Not installed: run PowerShell through a headless console so no window flashes up.
+        New-ScheduledTaskAction -Execute "$env:SystemRoot\System32\conhost.exe" -WorkingDirectory $PSScriptRoot `
+            -Argument "--headless `"$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe`" -NoProfile -ExecutionPolicy Bypass -STA -WindowStyle Hidden -File `"$PSCommandPath`" -AutoClean"
+    }
+    $user = [Security.Principal.WindowsIdentity]::GetCurrent().Name
+    $trigger = New-ScheduledTaskTrigger -AtLogOn -User $user
+    $trigger.Repetition = (New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes $Minutes)).Repetition
+    $principal = New-ScheduledTaskPrincipal -UserId $user -LogonType Interactive -RunLevel Highest
+    $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -MultipleInstances IgnoreNew `
+        -ExecutionTimeLimit (New-TimeSpan -Minutes 2)
+    Register-ScheduledTask -TaskName $AutoCleanTaskName -TaskPath $AutoCleanTaskPath -Action $action -Trigger $trigger -Principal $principal -Settings $settings `
+        -Description 'Peak Optimizations: ends useless background tasks (your auto-clean list) at sign-in and then on a timer. Turn it off in the app''s Background tab.' -Force | Out-Null
+    # Run once now so it starts working immediately, not only after the next sign-in.
+    Start-ScheduledTask -TaskName $AutoCleanTaskName -TaskPath $AutoCleanTaskPath -ErrorAction SilentlyContinue
+}
+
+function Test-AutoCleanTask { [bool](Get-ScheduledTask -TaskName $AutoCleanTaskName -TaskPath $AutoCleanTaskPath -ErrorAction SilentlyContinue) }
+#endregion
+
+# Scheduled auto-clean run: no window, just end the listed tasks and exit.
+if ($AutoClean) { [void](Invoke-AutoClean -DryRun:$DryRun); exit 0 }
+
 
 #region Data: tweaks ---------------------------------------------------------------
 function Reg([string]$Path, [string]$Name, $Value, [string]$Type = 'DWord') {
@@ -1131,7 +1428,26 @@ $xamlText = @'
               </StackPanel>
             </DockPanel>
           </Border>
-          <Grid>
+          <Border DockPanel.Dock="Top" Style="{StaticResource Card}" Padding="14,10">
+            <StackPanel>
+              <WrapPanel>
+                <CheckBox x:Name="ChkAutoClean" Style="{StaticResource Switch}" Content="Auto-end useless background tasks" VerticalAlignment="Center" Margin="0,4,18,4" FontWeight="SemiBold"/>
+                <ComboBox x:Name="CmbAutoInterval" Width="150" Padding="6,3" VerticalAlignment="Center" Margin="0,4,18,4"/>
+                <CheckBox x:Name="ChkAutoSuspended" Content="Include suspended apps" VerticalAlignment="Center" Margin="0,4,18,4"
+                          ToolTip="Closed apps Windows keeps frozen in memory (Settings, Photos, Calculator...). They do nothing; ending them just frees the memory. Apps you have open or minimized are never touched."/>
+                <CheckBox x:Name="ChkAutoClosed" Content="Keep doing it when this app is closed" VerticalAlignment="Center" Margin="0,4,18,4"
+                          ToolTip="Adds a hidden Windows scheduled task that runs a quick clean at sign-in and then on the same timer. Nothing stays running in between."/>
+              </WrapPanel>
+              <DockPanel Margin="0,6,0,0">
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
+                  <Button x:Name="BtnAutoUseTicked" Content="Auto-End the Ticked Apps" ToolTip="Replace the auto-clean list with the apps ticked below"/>
+                  <Button x:Name="BtnAutoReset" Content="Default List"/>
+                  <Button x:Name="BtnAutoRunNow" Content="Run Now"/>
+                </StackPanel>
+                <TextBlock x:Name="TxtAutoList" Style="{StaticResource Muted}" FontSize="12" TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,12,0"/>
+              </DockPanel>
+            </StackPanel>
+          </Border>          <Grid>
             <Grid.ColumnDefinitions>
               <ColumnDefinition/>
               <ColumnDefinition/>
@@ -3591,147 +3907,10 @@ $ui.BtnKeyboardDefaults.Add_Click({
 })
 $ui.BtnRefreshDevices.Add_Click({ Show-InputDevices })
 
-# ---------- Background apps ----------
-# 'process|label|end?|note' - end? = 1 means safe and pre-selected for ending.
-$BgKnown = @{}
-@(
-    'msedge|Microsoft Edge (background)|1|Edge keeps running after you close it (Startup boost).'
-    'MicrosoftEdgeUpdate|Edge updater|1|Checks for Edge updates.'
-    'GoogleUpdate|Google updater|1|Checks for Chrome/Google updates.'
-    'GoogleCrashHandler|Google crash reporter|1|Sends Google crash reports.'
-    'GoogleCrashHandler64|Google crash reporter|1|Sends Google crash reports.'
-    'OneDrive|OneDrive|1|Cloud sync pauses until you open OneDrive again.'
-    'PhoneExperienceHost|Phone Link|1|Phone notifications on the PC stop until you open it.'
-    'YourPhone|Phone Link|1|Phone notifications on the PC stop until you open it.'
-    'Widgets|Windows Widgets|1|Reopens when you open the Widgets board.'
-    'WidgetService|Windows Widgets|1|Reopens when you open the Widgets board.'
-    'MicrosoftStartFeedProvider|Windows Widgets|1|Reopens when you open the Widgets board.'
-    'ms-teams|Microsoft Teams|1|Teams notifications stop until you open it.'
-    'MSTeams|Microsoft Teams|1|Teams notifications stop until you open it.'
-    'Teams|Microsoft Teams|1|Teams notifications stop until you open it.'
-    'Skype|Skype|1|Skype notifications stop until you open it.'
-    'Copilot|Microsoft Copilot|1|Reopens when you use Copilot.'
-    'Cortana|Cortana|1|Reopens when you use Cortana.'
-    'GameBar|Xbox Game Bar|1|Reopens when you press Win+G.'
-    'GameBarFTServer|Xbox Game Bar helper|1|Reopens when you press Win+G.'
-    'AdobeARM|Adobe updater|1|Checks for Adobe Reader updates.'
-    'AcrobatNotificationClient|Adobe Acrobat notifications|1|Adobe pop-ups.'
-    'AdobeCollabSync|Adobe Acrobat sync|1|Adobe document sync.'
-    'CCXProcess|Adobe Creative Cloud helper|1|Starts again with Creative Cloud apps.'
-    'CoreSync|Adobe file sync|1|Starts again with Creative Cloud.'
-    'Adobe Desktop Service|Adobe Creative Cloud service|1|Starts again with Creative Cloud apps.'
-    'AdobeIPCBroker|Adobe helper|1|Starts again with Adobe apps.'
-    'jusched|Java updater|1|Checks for Java updates.'
-    'CCleaner64|CCleaner monitoring|1|Background monitoring and pop-ups.'
-    'iTunesHelper|iTunes helper|1|Starts iTunes when an iPhone is plugged in.'
-    'SpotifyWebHelper|Spotify web helper|1|Not needed for Spotify to play.'
-    'lghub_updater|Logitech G HUB updater|1|Checks for G HUB updates.'
-    'Steam|Steam|0|Needed to play Steam games (Rust, Siege on Steam).'
-    'steamwebhelper|Steam|0|Part of Steam.'
-    'EpicGamesLauncher|Epic Games Launcher|0|Needed to play Epic games (Fortnite).'
-    'EpicWebHelper|Epic Games Launcher|0|Needed to play Epic games (Fortnite).'
-    'EpicOnlineServicesUserHelper|Epic Games Launcher|0|Needed to play Epic games (Fortnite).'
-    'EOSOverlayRenderer-Win64-Shipping|Epic Games Launcher|0|Needed to play Epic games (Fortnite).'
-    'MedalEncoder|Medal.tv|0|Clip recording stops.'
-    'StreamDeck|Elgato Stream Deck|0|Stream Deck buttons stop working.'
-    'wallpaper32|Wallpaper Engine|0|Animated wallpaper stops (it already pauses itself during games).'
-    'wallpaper64|Wallpaper Engine|0|Animated wallpaper stops (it already pauses itself during games).'
-    'NVIDIA Share|NVIDIA overlay|0|ShadowPlay recording and the Alt+Z overlay stop.'
-    'nvsphelper64|NVIDIA overlay|0|ShadowPlay recording and the Alt+Z overlay stop.'
-    'upc|Ubisoft Connect|0|Needed to play Ubisoft games (Siege).'
-    'UbisoftConnect|Ubisoft Connect|0|Needed to play Ubisoft games (Siege).'
-    'EADesktop|EA app|0|Needed to play EA games.'
-    'Battle.net|Battle.net|0|Needed to play Blizzard games.'
-    'RiotClientServices|Riot Client|0|Needed to play Riot games.'
-    'GalaxyClient|GOG Galaxy|0|Needed to play GOG games through Galaxy.'
-    'Discord|Discord|0|Voice chat and messages stop.'
-    'Spotify|Spotify|0|Music stops.'
-    'Dropbox|Dropbox|0|Cloud sync pauses.'
-    'GoogleDriveFS|Google Drive|0|Cloud sync pauses.'
-    'Overwolf|Overwolf|0|Game add-ons stop.'
-    'Medal|Medal.tv|0|Clip recording stops.'
-    'iCUE|Corsair iCUE|0|RGB lighting, DPI profiles and macros from iCUE stop.'
-    'lghub|Logitech G HUB|0|Lighting, DPI profiles and macros from G HUB stop.'
-    'lghub_agent|Logitech G HUB|0|Lighting, DPI profiles and macros from G HUB stop.'
-    'RazerAppEngine|Razer Synapse|0|Lighting, DPI profiles and macros from Synapse stop.'
-    'SteelSeriesGG|SteelSeries GG|0|Lighting and device profiles stop.'
-    'SteelSeriesEngine|SteelSeries Engine|0|Lighting and device profiles stop.'
-    'ArmouryCrate|ASUS Armoury Crate|0|Lighting and fan profiles stop.'
-    'ArmourySocketServer|ASUS Armoury Crate|0|Lighting and fan profiles stop.'
-    'ArmouryCrate.UserSessionHelper|ASUS Armoury Crate|0|Lighting and fan profiles stop.'
-    'ArmourySwAgent|ASUS Armoury Crate|0|Lighting and fan profiles stop.'
-    'SignalRgb|SignalRGB|0|RGB lighting stops.'
-    'RadeonSoftware|AMD Software (Adrenalin)|0|Overlay and hotkeys stop; the graphics driver keeps working.'
-    'MSIAfterburner|MSI Afterburner|0|GPU overclock/fan curve and overlay stop.'
-    'RTSS|RivaTuner Statistics Server|0|FPS limiter and overlay stop.'
-) | ForEach-Object {
-    $p = $_ -split '\|'
-    $BgKnown[$p[0]] = @{ Label = $p[1]; End = $p[2] -eq '1'; Note = $p[3] }
-}
-# Never listed: Windows, security, anti-cheat and hardware-driver helpers.
-$BgNever = '^(explorer|dwm|csrss|winlogon|lsass|services|smss|wininit|fontdrvhost|sihost|ctfmon|RuntimeBroker|ShellExperienceHost|' +
-    'StartMenuExperienceHost|SearchHost|SearchApp|TextInputHost|SecurityHealth.*|audiodg|conhost|dllhost|taskhostw|ApplicationFrameHost|' +
-    'SystemSettings|LockApp|smartscreen|WmiPrvSE|svchost|msedgewebview2|powershell|pwsh|WindowsTerminal|OpenConsole|cmd|' +
-    'vgc|vgtray|EasyAntiCheat.*|BEService.*|BEDaisy|FACEIT.*|faceit.*|EAAntiCheat.*|PnkBstr.*|mbam.*|MBAM.*|MsMpEng|NisSrv|' +
-    'avp|avast.*|AvastUI|avg.*|ekrn|egui|bdagent|vsserv|NortonSecurity|' +
-    'NVDisplay\.Container|nvcontainer|atiesrxx|atieclxx|amdfendr.*|AMDRS.*|amdow|RtkAud.*|RtkNGUI.*|Realtek.*|Nahimic.*|A3DUtility|Waves.*|' +
-    'igfx.*|IntelCpHDCPSvc|jhi_service|LMS|esif_.*|SynTP.*|ETDCtrl|Wacom.*|WTablet.*)$'
-
-function Get-BackgroundApps {
-    $session = (Get-Process -Id $PID).SessionId
-    $all = @(Get-Process | Where-Object { $_.SessionId -eq $session })
-    $byId = @{}
-    foreach ($p in $all) { $byId[$p.Id] = $p }
-    $windowed = @{}
-    foreach ($p in $all) { if ($p.MainWindowHandle -ne [IntPtr]::Zero) { $windowed[$p.Name] = $true } }
-    $parentOf = @{}
-    foreach ($w in Get-CimInstance Win32_Process -Filter "SessionId = $session" -Property ProcessId, ParentProcessId -ErrorAction SilentlyContinue) { $parentOf[[int]$w.ProcessId] = [int]$w.ParentProcessId }
-    $entries = [ordered]@{}
-    foreach ($g in $all | Where-Object { $_.Id -ne $PID } | Group-Object Name) {
-        $name = $g.Name
-        if ($name -match $BgNever -or $windowed[$name]) { continue }   # system/protected, or an app you have open
-        # Helpers of an app you have open (e.g. a code editor's background workers) are left alone.
-        $helper = @($g.Group | Where-Object { $pp = $byId[$parentOf[$_.Id]]; $pp -and ($windowed[$pp.Name] -or $pp.Id -eq $PID) })
-        if ($helper.Count -eq $g.Count) { continue }
-        $path = ($g.Group | Where-Object Path | Select-Object -First 1).Path
-        if ($path -and $path.StartsWith($env:SystemRoot, [StringComparison]::OrdinalIgnoreCase)) { continue }
-        $known = $BgKnown[$name]
-        $desc = if ($known) { $known.Label } else { ($g.Group | Where-Object Description | Select-Object -First 1).Description }
-        $parents = @($g.Group | ForEach-Object { $pp = $byId[$parentOf[$_.Id]]; if ($pp -and $pp.Name -ne $name) { $pp.Name } } | Select-Object -Unique)
-        $entries[$name] = [pscustomobject]@{
-            Name        = $name
-            Label       = if ($desc) { $desc } else { $name }
-            Note        = if ($known) { $known.Note }
-                          elseif ($parents -and $parents -notcontains 'explorer') { "Helper started by $(($parents | ForEach-Object { "$_.exe" }) -join ', ')" }
-                          elseif ($path) { $path } else { "$name.exe" }
-            Recommended = [bool]($known -and $known.End)
-            Known       = [bool]$known
-            MB          = [math]::Round(($g.Group | Measure-Object WorkingSet64 -Sum).Sum / 1MB)
-            Ids         = @($g.Group.Id)
-            Parent      = if ($parents.Count -eq 1) { $parents[0] } else { $null }
-        }
-    }
-    # Unknown helper processes are folded into the app that started them...
-    foreach ($key in @($entries.Keys)) {
-        $e = $entries[$key]
-        if ($e.Known -or -not $e.Parent -or -not $entries.Contains($e.Parent)) { continue }
-        $owner = $entries[$e.Parent]
-        $owner.MB += $e.MB; $owner.Ids += $e.Ids
-        $entries.Remove($key)
-    }
-    # ...and known apps made of several processes (e.g. Epic, Medal) show as one entry.
-    foreach ($grp in $entries.Values | Group-Object Label) {
-        if ($grp.Count -eq 1 -or -not $grp.Group[0].Known) { $grp.Group; continue }
-        $first = $grp.Group[0]
-        $first.MB = ($grp.Group | Measure-Object MB -Sum).Sum
-        $first.Ids = @($grp.Group | ForEach-Object { $_.Ids })
-        $first.Recommended = -not @($grp.Group | Where-Object { -not $_.Recommended })
-        $first
-    }
-}
-
+# ---------- Background apps (data and Get-BackgroundApps live in the "Background tasks" region near the top) ----------
 $BgChecks = New-Object System.Collections.Generic.List[object]
 function Update-Background {
+    $autoCfg = Get-AutoCleanConfig
     $apps = @(Get-BackgroundApps)
     $ui.BgPanel.Children.Clear(); $BgChecks.Clear()
     $groups = @(
@@ -3747,7 +3926,8 @@ function Update-Background {
             $stack = New-Object System.Windows.Controls.StackPanel
             $line = New-TextLine ('{0}  -  {1} MB' -f $a.Label, $a.MB)
             $line.Margin = [System.Windows.Thickness]::new(0)
-            $note = New-TextLine $a.Note -Muted
+            $isAuto = $autoCfg.Enabled -and (($autoCfg.Suspended -and $a.Suspended) -or @($a.Names | Where-Object { $autoCfg.Names -contains $_ }).Count)
+            $note = New-TextLine ($a.Note + $(if ($isAuto) { '  -  auto-ended' } else { '' })) -Muted
             $note.FontSize = 11
             [void]$stack.Children.Add($line); [void]$stack.Children.Add($note)
             $cb = New-Object System.Windows.Controls.CheckBox
@@ -3766,16 +3946,6 @@ function Update-Background {
     Update-StartupList
 }
 
-function Stop-BackgroundApps([object[]]$Apps) {
-    $freed = 0
-    foreach ($a in $Apps) {
-        $failed = 0
-        foreach ($id in $a.Ids) { try { Stop-Process -Id $id -Force -ErrorAction Stop } catch { if (Get-Process -Id $id -ErrorAction SilentlyContinue) { $failed++ } } }
-        if ($failed) { Write-Log "  $($a.Label): $failed process(es) could not be ended." 'WARN' } else { Write-Log "  Ended $($a.Label) ($($a.MB) MB)"; $freed += $a.MB }
-    }
-    Write-Log ('Freed about {0:N0} MB of memory.' -f $freed)
-}
-
 $ui.BtnBgEnd.Add_Click({
     $picked = @((Get-Checked $BgChecks) | ForEach-Object Tag)
     if (-not $picked) { [System.Windows.MessageBox]::Show('Select at least one app to end.', $AppName) | Out-Null; return }
@@ -3786,6 +3956,90 @@ $ui.BtnBgEnd.Add_Click({
 })
 $ui.BtnBgRefresh.Add_Click({ Update-Background })
 
+# ---------- Auto-clean controls ----------
+$AutoIntervals = [ordered]@{ 'Every 5 minutes' = 5; 'Every 15 minutes' = 15; 'Every 30 minutes' = 30; 'Every hour' = 60 }
+foreach ($k in $AutoIntervals.Keys) { [void]$ui.CmbAutoInterval.Items.Add($k) }
+
+function Get-AutoLabel([string]$Name) { if ($BgKnown[$Name]) { $BgKnown[$Name].Label } else { $Name } }
+
+function Show-AutoClean {
+    $c = Get-AutoCleanConfig
+    $script:LoadingAuto = $true
+    try {
+        $ui.ChkAutoClean.IsChecked = $c.Enabled
+        $ui.ChkAutoSuspended.IsChecked = $c.Suspended
+        $ui.ChkAutoClosed.IsChecked = $c.WhenClosed
+        $ui.CmbAutoInterval.SelectedItem = @($AutoIntervals.Keys | Where-Object { $AutoIntervals[$_] -eq $c.Minutes })[0]
+        if ($ui.CmbAutoInterval.SelectedIndex -lt 0) { $ui.CmbAutoInterval.SelectedItem = 'Every 15 minutes' }
+    } finally { $script:LoadingAuto = $false }
+    $labels = @($c.Names | ForEach-Object { Get-AutoLabel $_ } | Select-Object -Unique | Sort-Object)
+    $what = if ($labels) { $labels -join ', ' } else { 'nothing from the list' }
+    if ($c.Suspended) { $what += ' + suspended apps' }
+    $state = if (-not $c.Enabled) { 'Off.' }
+             elseif ($c.WhenClosed) { "On - every $($c.Minutes) min, also while this app is closed$(if (-not (Test-AutoCleanTask)) { ' (scheduled task missing - toggle the option to recreate it)' })." }
+             else { "On - every $($c.Minutes) min while this app is open." }
+    $ui.TxtAutoList.Text = "$state Ends: $what. Apps you have open, Windows itself, security, anti-cheat and drivers are never touched."
+    $AutoCleanTimer.Stop()
+    if ($c.Enabled) { $AutoCleanTimer.Interval = [TimeSpan]::FromMinutes($c.Minutes); $AutoCleanTimer.Start() }
+}
+
+function Save-AutoCleanFromUi {
+    if ($script:LoadingAuto) { return }
+    $c = Get-AutoCleanConfig
+    $before = @($c.Enabled -and $c.WhenClosed, $c.Minutes)
+    $c.Enabled = [bool]$ui.ChkAutoClean.IsChecked
+    $c.Suspended = [bool]$ui.ChkAutoSuspended.IsChecked
+    $c.WhenClosed = [bool]$ui.ChkAutoClosed.IsChecked
+    if ($ui.CmbAutoInterval.SelectedItem) { $c.Minutes = $AutoIntervals[[string]$ui.CmbAutoInterval.SelectedItem] }
+    Save-AutoCleanConfig $c
+    $wantTask = $c.Enabled -and $c.WhenClosed
+    if ($before[0] -ne $wantTask -or ($wantTask -and $before[1] -ne $c.Minutes) -or ($wantTask -and -not (Test-AutoCleanTask))) {
+        try {
+            Set-AutoCleanTask $wantTask $c.Minutes
+            Write-Log $(if ($wantTask) { "Auto-clean will also run every $($c.Minutes) min while the app is closed (scheduled task added)." } else { 'Auto-clean scheduled task removed.' })
+        } catch { Write-Log "Could not update the auto-clean scheduled task: $($_.Exception.Message)" 'ERROR' }
+    }
+    Show-AutoClean
+}
+
+function Invoke-AutoCleanInApp {
+    $ended = @(Invoke-AutoClean)
+    if ($ended.Count -and [string]$ui.Tabs.SelectedItem.Header -eq 'Background') { Update-Background }
+    $ended.Count
+}
+
+$AutoCleanTimer = New-Object System.Windows.Threading.DispatcherTimer
+$AutoCleanTimer.Add_Tick({ $AutoCleanTimer.Interval = [TimeSpan]::FromMinutes((Get-AutoCleanConfig).Minutes); [void](Invoke-AutoCleanInApp) })
+
+$ui.ChkAutoClean.Add_Click({ Save-AutoCleanFromUi; Write-Log ('Auto-clean: {0}' -f $(if ($ui.ChkAutoClean.IsChecked) { 'On' } else { 'Off' })) })
+$ui.ChkAutoSuspended.Add_Click({ Save-AutoCleanFromUi })
+$ui.ChkAutoClosed.Add_Click({ Save-AutoCleanFromUi })
+$ui.CmbAutoInterval.Add_SelectionChanged({ Save-AutoCleanFromUi })
+$ui.BtnAutoUseTicked.Add_Click({
+    $names = @((Get-Checked $BgChecks) | Where-Object { -not $_.Tag.Suspended } | ForEach-Object { $_.Tag.Names } | Select-Object -Unique)
+    if (-not $names) { [System.Windows.MessageBox]::Show('Tick the apps you want ended automatically first (suspended apps are covered by "Include suspended apps").', $AppName) | Out-Null; return }
+    $c = Get-AutoCleanConfig
+    $c.Names = $names
+    Save-AutoCleanConfig $c
+    Write-Log "Auto-clean list set to: $(($names | ForEach-Object { Get-AutoLabel $_ } | Select-Object -Unique) -join ', ')"
+    Show-AutoClean; Update-Background
+})
+$ui.BtnAutoReset.Add_Click({
+    $c = Get-AutoCleanConfig
+    $c.Names = $AutoCleanDefaults
+    Save-AutoCleanConfig $c
+    Write-Log 'Auto-clean list reset to the default (updaters, Widgets, Game Bar helpers, Copilot, Adobe/Java/Google helpers...).'
+    Show-AutoClean; Update-Background
+})
+$ui.BtnAutoRunNow.Add_Click({
+    $n = Invoke-AutoCleanInApp
+    if (-not $n) { Write-Log 'Auto-clean: nothing on the list is running right now.' }
+    Update-Background
+})
+
+Show-AutoClean
+# First clean shortly after the app opens, then on the chosen interval.
+if ((Get-AutoCleanConfig).Enabled) { $AutoCleanTimer.Interval = [TimeSpan]::FromSeconds(20); $AutoCleanTimer.Start() }
 # ---------- Startup apps (same on/off switch as Task Manager's Startup tab) ----------
 $StartupRecommend = '(?i)(OneDrive|Teams|Skype|Spotify|Discord|Steam|EpicGames|Adobe|Acrobat|CCleaner|MicrosoftEdgeAutoLaunch|GoogleUpdate|' +
     'Opera|Brave|iTunes|Overwolf|Medal|Dropbox|GoogleDrive|Ubisoft|EADesktop|EA app|Battle\.net|Riot|Zoom|Slack|WhatsApp|Telegram|Cortana|Copilot|' +
@@ -3977,6 +4231,15 @@ if ($SelfTest) {
         $pendingAfterLoad -eq 0 -and $ui.DevicePanel.Children.Count -gt 0 -and $ui.StartupPanel.Children.Count -gt 0
     Write-Host ("  Display / Peripherals / Background: {0}" -f $(if ($sysOk) { 'OK' } else { 'FAILED' }))
     if (-not $sysOk) { exit 1 }
+
+    # Auto-clean: defaults, UI and a dry run (nothing is ended; no scheduled task is created).
+    $ac = Get-AutoCleanConfig
+    $dry = @(Get-AutoCleanTargets $ac)
+    $autoOk = $ac.Minutes -ge 5 -and $AutoCleanDefaults.Count -gt 5 -and $AutoCleanDefaults -notcontains 'OneDrive' -and $AutoCleanDefaults -notcontains 'Steam' -and
+        $ui.CmbAutoInterval.SelectedIndex -ge 0 -and $ui.TxtAutoList.Text -like '*Ends:*'
+    Write-Host ("  Auto-clean: {0} (default list {1} processes; would end now: {2})" -f $(if ($autoOk) { 'OK' } else { 'FAILED' }), $AutoCleanDefaults.Count,
+        $(if ($dry) { ($dry | ForEach-Object { "$($_.Label) ($($_.MB) MB)" }) -join ', ' } else { 'nothing' }))
+    if (-not $autoOk) { exit 1 }
     exit 0
 }
 $timer.Start()
