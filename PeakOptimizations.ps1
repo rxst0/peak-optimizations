@@ -1635,7 +1635,7 @@ function Start-InfoRefresh {
         # Driver pages: use the exact product page when the vendor has one, else the vendor's auto-detect page.
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
         function Test-Url([string]$Url) {
-            try { (Invoke-WebRequest $Url -UseBasicParsing -TimeoutSec 10 -UserAgent 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)').StatusCode -eq 200 } catch { $false }
+            try { (Invoke-WebRequest $Url -UseBasicParsing -TimeoutSec 4 -UserAgent 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)').StatusCode -eq 200 } catch { $false }
         }
         $amdBase = 'https://www.amd.com/en/support/downloads/drivers.html'
         $gpus = foreach ($v in Get-CimInstance Win32_VideoController) {
@@ -1927,6 +1927,8 @@ $ui.BtnScanDrivers.Add_Click({
             Write-Log 'Note: the "Security Updates Only" policy hides drivers from Windows Update. Use the vendor buttons above instead.'
         }
     } -OnComplete {
+        # $null means the scan itself failed (already logged); an empty array means nothing to update.
+        if ($null -eq $sync.Result) { return }
         $ui.DriverList.Children.Clear(); $DriverChecks.Clear()
         $list = @($sync.Result)
         if (-not $list) {
@@ -2034,6 +2036,24 @@ if ($SelfTest) {
     foreach ($g in $Games) { Write-Host "  $($g.Name): $($g.Status.Text)" }
     $missing = @($ui.Keys | Where-Object { -not $ui[$_] })
     if ($missing) { Write-Host "Missing controls: $($missing -join ', ')"; exit 1 }
+
+    # Run the startup job through the real runspace runner and dispatcher timer.
+    $timer.Start()
+    Start-InfoRefresh
+    $deadline = (Get-Date).AddSeconds(90)
+    while ($sync.Job -and (Get-Date) -lt $deadline) {
+        $frame = New-Object System.Windows.Threading.DispatcherFrame
+        $pump = New-Object System.Windows.Threading.DispatcherTimer
+        $pump.Interval = [TimeSpan]::FromMilliseconds(200)
+        $pump.Add_Tick({ $pump.Stop(); $frame.Continue = $false })
+        $pump.Start()
+        [System.Windows.Threading.Dispatcher]::PushFrame($frame)
+    }
+    $timer.Stop()
+    $line = $null; while ($sync.Log.TryDequeue([ref]$line)) { if ($line -match 'ERROR|WARN') { Write-Host "  log: $line" } }
+    $ok = -not $sync.Job -and $ui.InfoPanel.Children.Count -gt 1 -and $ui.HwPanel.Children.Count -gt 0
+    Write-Host ("  Background job: {0} ({1} info cards, {2} hardware cards)" -f $(if ($ok) { 'OK' } else { 'FAILED' }), $ui.InfoPanel.Children.Count, $ui.HwPanel.Children.Count)
+    if (-not $ok) { exit 1 }
     exit 0
 }
 $timer.Start()
