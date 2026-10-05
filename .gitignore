@@ -1,3 +1,4 @@
 *.log
 backup.json
 dist/
+tools/icon-preview.png

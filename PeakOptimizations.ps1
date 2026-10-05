@@ -13,7 +13,7 @@ param(
 
 #region Bootstrap ---------------------------------------------------------------
 $AppName = 'Peak Optimizations'
-$AppVersion = '1.3.0'
+$AppVersion = '1.4.0'
 
 $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(
     [Security.Principal.WindowsBuiltInRole]::Administrator)
@@ -1591,6 +1591,8 @@ $ui = @{}
 # Controls are PascalCase; lowercase names are template parts and can't be found from the window.
 foreach ($m in [regex]::Matches($xamlText, 'x:Name="([A-Z]\w+)"')) { $ui[$m.Groups[1].Value] = $window.FindName($m.Groups[1].Value) }
 $ui.TxtVersion.Text = "v$AppVersion"
+$iconPath = Join-Path $PSScriptRoot 'PeakOptimizations.ico'
+if (Test-Path $iconPath) { try { $window.Icon = [System.Windows.Media.Imaging.BitmapFrame]::Create([Uri]$iconPath) } catch { } }
 #endregion
 
 #region Background job runner -----------------------------------------------------------

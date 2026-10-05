@@ -1,12 +1,18 @@
 # Peak Optimizations
 
 A lightweight Windows 10/11 optimization utility inspired by Chris Titus Tech's WinUtil.
-One PowerShell file (~225 KB), no install, no dependencies — it uses the PowerShell 5.1 + WPF that ship with Windows.
+One PowerShell file (~225 KB) plus a tiny installer, no dependencies — it uses the PowerShell 5.1 + WPF that ship with Windows.
 
-## Run
+## Install
 
-Double-click **`Launch Peak Optimizations.bat`** and accept the UAC prompt.
-(Or: `powershell -ExecutionPolicy Bypass -File .\PeakOptimizations.ps1`)
+1. Download **PeakOptimizations-vX.Y.Z.zip** from [Releases](https://github.com/rxst0/peak-optimizations/releases/latest) and extract it.
+2. Double-click **`Install Peak Optimizations.bat`** and accept the admin prompt.
+
+That's it — search **"Peak"** in the Start menu to open it (there's a desktop shortcut too).
+It installs to `C:\Program Files\Peak Optimizations`, appears in **Settings › Apps**, and can be uninstalled from there.
+Running the installer again updates it; your settings, tweak backups and macros are kept.
+
+**Without installing:** double-click `Launch Peak Optimizations.bat` instead.
 
 ## Tabs
 
