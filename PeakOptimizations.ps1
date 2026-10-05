@@ -1030,7 +1030,31 @@ $xamlText = @'
         </Setter.Value>
       </Setter>
     </Style>
-    <Style x:Key="Card" TargetType="Border">
+    <Style x:Key="Spin" TargetType="RepeatButton">
+      <Setter Property="Width" Value="18"/>
+      <Setter Property="Height" Value="12"/>
+      <Setter Property="Margin" Value="0,0,0,1"/>
+      <Setter Property="Delay" Value="400"/>
+      <Setter Property="Interval" Value="60"/>
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="RepeatButton">
+            <Border x:Name="b" Background="#2A2A3A" CornerRadius="3">
+              <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="b" Property="Background" Value="#3A3A50"/></Trigger>
+              <Trigger Property="IsEnabled" Value="False"><Setter TargetName="b" Property="Opacity" Value="0.4"/></Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style TargetType="RadioButton">
+      <Setter Property="Foreground" Value="#E6E6F0"/>
+      <Setter Property="Cursor" Value="Hand"/>
+    </Style>    <Style x:Key="Card" TargetType="Border">
       <Setter Property="Background" Value="#1C1C28"/>
       <Setter Property="CornerRadius" Value="10"/>
       <Setter Property="Padding" Value="14"/>
@@ -1195,7 +1219,7 @@ $xamlText = @'
             <DockPanel>
               <CheckBox x:Name="ChkMacrosEnabled" DockPanel.Dock="Right" Style="{StaticResource Switch}" Content="Hotkeys enabled" VerticalAlignment="Center" Margin="16,0,0,0"/>
               <StackPanel>
-                <TextBlock x:Name="TxtMacroState" Text="Hotkeys off. Turn them on to play macros with their hotkeys." FontWeight="SemiBold" Margin="0,0,0,4"/>
+                <TextBlock x:Name="TxtMacroState" Text="Stopped. Turn hotkeys on to play saved macros with their keys." FontWeight="SemiBold" Margin="0,0,0,4"/>
                 <TextBlock TextWrapping="Wrap" Foreground="#FFB454" FontSize="12"
                   Text="Using macros in online games can break their rules - anti-cheats (Easy Anti-Cheat, BattlEye, Vanguard, Ricochet) may flag automated input and ban the account. Use macros for single-player games, desktop tasks or where the game allows them. Macros only run while this app is open."/>
               </StackPanel>
@@ -1203,55 +1227,100 @@ $xamlText = @'
           </Border>
           <Grid>
             <Grid.ColumnDefinitions>
-              <ColumnDefinition Width="320"/>
+              <ColumnDefinition Width="250"/>
               <ColumnDefinition/>
             </Grid.ColumnDefinitions>
+
             <Border Grid.Column="0" Style="{StaticResource Card}">
               <DockPanel>
                 <TextBlock DockPanel.Dock="Top" Style="{StaticResource H}" Text="Your Macros"/>
-                <StackPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
-                  <CheckBox x:Name="ChkRecordMoves" Content="Record mouse movement and click positions" ToolTip="Off: clicks happen wherever the cursor is during playback (best for games). On: the cursor moves to the recorded positions (best for desktop tasks)."/>
-                  <WrapPanel Margin="-4,4,0,0">
-                    <Button x:Name="BtnMacroNew" Content="Record New" Style="{StaticResource AccentButton}" ToolTip="Recording starts after a 3 second countdown. Press F8 to stop."/>
-                    <Button x:Name="BtnMacroDelete" Content="Delete"/>
-                    <Button x:Name="BtnMacroImport" Content="Import"/>
-                    <Button x:Name="BtnMacroExport" Content="Export"/>
-                    <Button x:Name="BtnMacroExportAll" Content="Export All"/>
-                  </WrapPanel>
-                </StackPanel>
+                <WrapPanel DockPanel.Dock="Bottom" Margin="-4,8,0,0">
+                  <Button x:Name="BtnMacroNew" Content="New" Style="{StaticResource AccentButton}"/>
+                  <Button x:Name="BtnMacroDelete" Content="Delete"/>
+                  <Button x:Name="BtnMacroImport" Content="Import"/>
+                  <Button x:Name="BtnMacroExport" Content="Export"/>
+                  <Button x:Name="BtnMacroExportAll" Content="Export All"/>
+                </WrapPanel>
                 <ListBox x:Name="LstMacros" Background="Transparent" BorderThickness="0" Foreground="#E6E6F0" FontSize="13"/>
               </DockPanel>
             </Border>
+
             <Border Grid.Column="1" Style="{StaticResource Card}" Margin="0,0,0,10">
               <DockPanel x:Name="MacroEditor" IsEnabled="False">
-                <StackPanel DockPanel.Dock="Top">
-                  <WrapPanel Margin="0,0,0,6">
-                    <StackPanel Margin="0,0,12,6">
-                      <TextBlock Text="Name" Style="{StaticResource Muted}" Margin="0,0,0,3"/>
-                      <TextBox x:Name="TxtMacroName" Width="220" Padding="6,4"/>
-                    </StackPanel>
-                    <StackPanel Margin="0,0,12,6">
-                      <TextBlock Text="Hotkey (press to start / stop)" Style="{StaticResource Muted}" Margin="0,0,0,3"/>
-                      <ComboBox x:Name="CmbMacroHotkey" Width="190" Padding="6,4"/>
-                    </StackPanel>
-                    <StackPanel Margin="0,0,12,6">
-                      <TextBlock Text="Repeat" Style="{StaticResource Muted}" Margin="0,0,0,3"/>
-                      <ComboBox x:Name="CmbMacroRepeat" Width="200" Padding="6,4"/>
-                    </StackPanel>
-                    <StackPanel Margin="0,0,12,6">
-                      <TextBlock Text="Speed" Style="{StaticResource Muted}" Margin="0,0,0,3"/>
-                      <ComboBox x:Name="CmbMacroSpeed" Width="90" Padding="6,4"/>
-                    </StackPanel>
-                  </WrapPanel>
-                  <WrapPanel Margin="-4,0,0,6">
-                    <Button x:Name="BtnMacroPlay" Content="Test Play" Style="{StaticResource AccentButton}" ToolTip="Plays once after a 3 second countdown."/>
-                    <Button x:Name="BtnMacroStop" Content="Stop"/>
-                    <Button x:Name="BtnMacroRerecord" Content="Re-record"/>
-                    <Button x:Name="BtnMacroDeleteStep" Content="Delete Step"/>
-                  </WrapPanel>
-                  <TextBlock x:Name="TxtMacroSummary" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,6" Text="Select a macro, or click Record New."/>
-                </StackPanel>
-                <ListBox x:Name="LstMacroSteps" Background="#16161F" BorderThickness="0" Foreground="#C8C8D8" FontFamily="Consolas" FontSize="12"/>
+                <DockPanel DockPanel.Dock="Bottom" Margin="0,10,0,0">
+                  <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                    <Button x:Name="BtnMacroSave" Content="Save" Width="100" Style="{StaticResource AccentButton}" IsEnabled="False"/>
+                    <Button x:Name="BtnMacroCancel" Content="Cancel" Width="100" IsEnabled="False" ToolTip="Discard unsaved changes"/>
+                  </StackPanel>
+                  <TextBlock x:Name="TxtMacroSummary" Style="{StaticResource Muted}" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                </DockPanel>
+                <Grid>
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition/>
+                    <ColumnDefinition Width="160"/>
+                    <ColumnDefinition Width="220"/>
+                  </Grid.ColumnDefinitions>
+
+                  <DockPanel Grid.Column="0">
+                    <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                      <TextBlock Text="Name:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                      <TextBox x:Name="TxtMacroName" Padding="6,4"/>
+                    </DockPanel>
+                    <TextBlock DockPanel.Dock="Top" Text="Steps" Style="{StaticResource Muted}" Margin="0,0,0,4"/>
+                    <ListBox x:Name="LstMacroSteps" Background="#16161F" BorderThickness="0" Foreground="#C8C8D8" FontFamily="Consolas" FontSize="12"/>
+                  </DockPanel>
+
+                  <StackPanel Grid.Column="1" Margin="12,0,0,0">
+                    <Button x:Name="BtnMacroStartRec" Content="Start Recording" Style="{StaticResource AccentButton}" Margin="0,0,0,6"
+                            ToolTip="Starts after a 3 second countdown. New steps go after the selected step. Press F8 to stop."/>
+                    <Button x:Name="BtnMacroStopRec" Content="Stop Recording" Margin="0,0,0,18" IsEnabled="False"/>
+                    <Button x:Name="BtnMacroInsert" Content="Insert &gt;&gt;" Margin="0,0,0,6" ToolTip="Insert a key, delay, mouse button or scroll step after the selected step"/>
+                    <Button x:Name="BtnMacroDeleteStep" Content="Delete" Margin="0,0,0,6"/>
+                    <Button x:Name="BtnMacroUp" Content="Move Up" Margin="0,0,0,6"/>
+                    <Button x:Name="BtnMacroDown" Content="Move Down" Margin="0,0,0,18"/>
+                    <DockPanel ToolTip="Edits the selected Delay step. Otherwise it is the length used by Insert &gt; Delay.">
+                      <TextBlock Text="Delay (s):" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                      <StackPanel DockPanel.Dock="Right" Margin="2,0,0,0" VerticalAlignment="Center">
+                        <RepeatButton x:Name="BtnDelayUp" Style="{StaticResource Spin}"><Path Data="M0,4 L4,0 L8,4 Z" Fill="#E6E6F0"/></RepeatButton>
+                        <RepeatButton x:Name="BtnDelayDown" Style="{StaticResource Spin}"><Path Data="M0,0 L8,0 L4,4 Z" Fill="#E6E6F0"/></RepeatButton>
+                      </StackPanel>
+                      <TextBox x:Name="TxtDelay" Text="0.05" Padding="4,3" VerticalContentAlignment="Center"/>
+                    </DockPanel>
+                  </StackPanel>
+
+                  <StackPanel Grid.Column="2" Margin="16,0,0,0">
+                    <TextBlock Text="When recording" Style="{StaticResource Muted}" Margin="0,0,0,4"/>
+                    <CheckBox x:Name="ChkRecDelays" Content="Record delays" IsChecked="True"/>
+                    <CheckBox x:Name="ChkRecMoves" Content="Mouse moves"/>
+                    <CheckBox x:Name="ChkRecClicks" Content="Mouse clicks" IsChecked="True"/>
+                    <CheckBox x:Name="ChkRecClickPos" Content="Click position" Margin="22,3,0,3"
+                              IsEnabled="{Binding IsChecked, ElementName=ChkRecClicks}"
+                              ToolTip="Clicks move the cursor to where they were recorded. Leave off for games."/>
+                    <TextBlock Text="Bound to:" Style="{StaticResource Muted}" Margin="0,14,0,4"/>
+                    <Border Background="#16161F" CornerRadius="6" Padding="8,6">
+                      <TextBlock x:Name="TxtMacroBound" Text="(none)" HorizontalAlignment="Center" FontWeight="SemiBold"/>
+                    </Border>
+                    <Button x:Name="BtnMacroBind" Content="Bind to Key" Margin="0,6,0,14"/>
+                    <RadioButton x:Name="RbMacroOnce" GroupName="MacroRepeat" Content="Play only once" Margin="0,3"/>
+                    <DockPanel Margin="0,3">
+                      <StackPanel DockPanel.Dock="Right" Margin="2,0,0,0" VerticalAlignment="Center">
+                        <RepeatButton x:Name="BtnRepeatUp" Style="{StaticResource Spin}"><Path Data="M0,4 L4,0 L8,4 Z" Fill="#E6E6F0"/></RepeatButton>
+                        <RepeatButton x:Name="BtnRepeatDown" Style="{StaticResource Spin}"><Path Data="M0,0 L8,0 L4,4 Z" Fill="#E6E6F0"/></RepeatButton>
+                      </StackPanel>
+                      <TextBox x:Name="TxtRepeatCount" DockPanel.Dock="Right" Width="56" Text="2" Padding="4,2" Margin="8,0,0,0" IsEnabled="False"/>
+                      <RadioButton x:Name="RbMacroRepeat" GroupName="MacroRepeat" Content="Repeat" VerticalAlignment="Center"/>
+                    </DockPanel>
+                    <RadioButton x:Name="RbMacroLoop" GroupName="MacroRepeat" Content="Repeat until stopped" Margin="0,3"/>
+                    <DockPanel Margin="0,10,0,0">
+                      <TextBlock Text="Speed:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                      <ComboBox x:Name="CmbMacroSpeed" Padding="6,3"/>
+                    </DockPanel>
+                    <WrapPanel Margin="-4,10,0,0">
+                      <Button x:Name="BtnMacroPlay" Content="Test Play" ToolTip="Plays the current edits after a 3 second countdown"/>
+                      <Button x:Name="BtnMacroStopPlay" Content="Stop"/>
+                    </WrapPanel>
+                  </StackPanel>
+                </Grid>
               </DockPanel>
             </Border>
           </Grid>
@@ -2095,11 +2164,12 @@ $window.Add_Closing({
         $ok = [System.Windows.MessageBox]::Show("'$($sync.Job.Title)' is still running. Closing now may leave it half-finished.`n`nClose anyway?", $AppName, 'YesNo', 'Warning')
         if ($ok -ne 'Yes') { $e.Cancel = $true; return }
     }
+    Confirm-DraftSaved
     if ($script:MacroEngineReady) { [Peak.MacroEngine]::Shutdown() }
 })
 #endregion
 
-#region Macros: record / play keyboard and mouse input -----------------------------------
+#region Macros: record / edit / play keyboard and mouse input ----------------------------
 # Compiled on first use only, so the app starts as fast as before.
 $MacroSource = @'
 using System;
@@ -2112,13 +2182,14 @@ namespace Peak
 {
     public class MacroEvent
     {
-        public int T { get; set; }          // milliseconds since the previous step
-        public string Type { get; set; }    // KeyDown, KeyUp, MouseDown, MouseUp, Move, Wheel
+        public int T { get; set; }          // Delay steps: milliseconds to wait. Recorded steps: ms since the previous one.
+        public string Type { get; set; }    // KeyDown, KeyUp, MouseDown, MouseUp, Move, Wheel, Delay
         public int Key { get; set; }        // virtual-key code
         public string Button { get; set; }  // Left, Right, Middle, X1, X2
         public int X { get; set; }
         public int Y { get; set; }
         public int Delta { get; set; }
+        public bool Pos { get; set; }       // mouse button steps: move to X,Y first
     }
 
     public class Macro
@@ -2127,7 +2198,6 @@ namespace Peak
         public string Name { get; set; }
         public int Repeat { get; set; }     // 0 = until stopped
         public double Speed { get; set; }
-        public bool UsePositions { get; set; }
         public List<MacroEvent> Events { get; set; }
     }
 
@@ -2172,12 +2242,12 @@ namespace Peak
         static MacroEvent[] finished;
         static long lastEventMs, lastMoveMs;
         static volatile bool stopRequested;
+        static volatile bool recordMoves, recordClicks, clickPositions;
 
         public static int StopRecordKey = 0x77;   // F8
         public static volatile bool Enabled;
         public static volatile bool IsRecording;
         public static volatile bool IsPlaying;
-        public static volatile bool RecordMoves;
         public static volatile string PlayingName = "";
         public static bool HooksActive { get { return keyboardHook != IntPtr.Zero; } }
         public static int RecordedCount { get { lock (gate) { return recording.Count; } } }
@@ -2228,13 +2298,14 @@ namespace Peak
             bindings = map;
         }
 
-        public static void StartRecording(bool recordMoves)
+        public static void StartRecording(bool moves, bool clicks, bool positions)
         {
             lock (gate) { recording = new List<MacroEvent>(); finished = null; lastEventMs = 0; lastMoveMs = 0; clock.Restart(); }
-            RecordMoves = recordMoves;
+            recordMoves = moves; recordClicks = clicks; clickPositions = positions;
             EnsureHookThread();
             IsRecording = true;
-            PostThreadMessage(hookThreadId, WM_MOUSE_HOOK_ON, IntPtr.Zero, IntPtr.Zero);
+            // The mouse hook only exists while recording mouse input, so games never get extra mouse latency.
+            if (moves || clicks) PostThreadMessage(hookThreadId, WM_MOUSE_HOOK_ON, IntPtr.Zero, IntPtr.Zero);
         }
 
         // dropLastClick: recording was stopped by clicking a button in this app, so drop that click.
@@ -2293,7 +2364,7 @@ namespace Peak
                         {
                             if (!down) heldHotkeys.Remove(vk);
                             else if (heldHotkeys.Add(vk)) { if (IsPlaying) StopPlayback(); else Play(m); }
-                            return (IntPtr)1;   // the hotkey itself is not passed to the game
+                            return (IntPtr)1;   // the hotkey itself is not passed on
                         }
                     }
                 }
@@ -2308,11 +2379,11 @@ namespace Peak
                 var m = (MSLLHOOKSTRUCT)Marshal.PtrToStructure(lParam, typeof(MSLLHOOKSTRUCT));
                 if ((m.flags & 0x01) == 0)
                 {
-                    var e = new MacroEvent { X = m.pt.x, Y = m.pt.y };
+                    var e = new MacroEvent { X = m.pt.x, Y = m.pt.y, Pos = clickPositions };
                     int hi = (short)((m.mouseData >> 16) & 0xFFFF);
                     switch (wParam.ToInt32())
                     {
-                        case 0x200: e.Type = RecordMoves ? "Move" : null; break;
+                        case 0x200: e.Type = recordMoves ? "Move" : null; break;
                         case 0x201: e.Type = "MouseDown"; e.Button = "Left"; break;
                         case 0x202: e.Type = "MouseUp"; e.Button = "Left"; break;
                         case 0x204: e.Type = "MouseDown"; e.Button = "Right"; break;
@@ -2323,6 +2394,7 @@ namespace Peak
                         case 0x20C: e.Type = "MouseUp"; e.Button = hi == 1 ? "X1" : "X2"; break;
                         case 0x20A: e.Type = "Wheel"; e.Delta = hi; break;
                     }
+                    if (e.Type != null && e.Type != "Move" && !recordClicks) e.Type = null;
                     if (e.Type != null) Record(e);
                 }
             }
@@ -2335,7 +2407,6 @@ namespace Peak
             MacroEvent[] steps = macro.Events.ToArray();
             int repeat = macro.Repeat;
             double speed = macro.Speed > 0 ? macro.Speed : 1.0;
-            bool positions = macro.UsePositions;
             stopRequested = false;
             IsPlaying = true;
             PlayingName = macro.Name ?? "";
@@ -2350,7 +2421,7 @@ namespace Peak
                         foreach (MacroEvent e in steps)
                         {
                             if (!Wait((int)(e.T / speed))) break;
-                            Send(e, positions, keys, buttons);
+                            Send(e, keys, buttons);
                         }
                         Thread.Sleep(1);
                     }
@@ -2382,15 +2453,15 @@ namespace Peak
             return false;
         }
 
-        static void Send(MacroEvent e, bool positions, HashSet<int> keys, HashSet<string> buttons)
+        static void Send(MacroEvent e, HashSet<int> keys, HashSet<string> buttons)
         {
             switch (e.Type)
             {
                 case "KeyDown": SendKey(e.Key, true); keys.Add(e.Key); break;
                 case "KeyUp": SendKey(e.Key, false); keys.Remove(e.Key); break;
-                case "Move": if (positions) MoveTo(e.X, e.Y); break;
-                case "MouseDown": if (positions) MoveTo(e.X, e.Y); SendButton(e.Button, true); buttons.Add(e.Button); break;
-                case "MouseUp": if (positions) MoveTo(e.X, e.Y); SendButton(e.Button, false); buttons.Remove(e.Button); break;
+                case "Move": MoveTo(e.X, e.Y); break;
+                case "MouseDown": if (e.Pos) MoveTo(e.X, e.Y); SendButton(e.Button, true); buttons.Add(e.Button); break;
+                case "MouseUp": if (e.Pos) MoveTo(e.X, e.Y); SendButton(e.Button, false); buttons.Remove(e.Button); break;
                 case "Wheel": SendMouse(0, 0, unchecked((uint)e.Delta), 0x0800); break;
             }
         }
@@ -2447,18 +2518,21 @@ namespace Peak
 
 $MacroFile = Join-Path $DataDir 'macros.json'
 $MacroEngineReady = $false
-$MacroStepTypes = 'KeyDown', 'KeyUp', 'MouseDown', 'MouseUp', 'Move', 'Wheel'
+$MacroStepTypes = 'KeyDown', 'KeyUp', 'MouseDown', 'MouseUp', 'Move', 'Wheel', 'Delay'
 $MacroButtons = 'Left', 'Right', 'Middle', 'X1', 'X2'
-
-# F8 is reserved for "stop recording".
-$MacroKeys = [ordered]@{ 'None' = 0 }
-foreach ($i in 1..24) { if ($i -ne 8) { $MacroKeys["F$i"] = 0x6F + $i } }
-foreach ($i in 0..9) { $MacroKeys["Numpad $i"] = 0x60 + $i }
-$MacroKeys['Numpad *'] = 0x6A; $MacroKeys['Numpad +'] = 0x6B; $MacroKeys['Numpad -'] = 0x6D; $MacroKeys['Numpad /'] = 0x6F; $MacroKeys['Numpad .'] = 0x6E
-$MacroKeys['Insert'] = 0x2D; $MacroKeys['Home'] = 0x24; $MacroKeys['Page Up'] = 0x21; $MacroKeys['Delete'] = 0x2E
-$MacroKeys['End'] = 0x23; $MacroKeys['Page Down'] = 0x22; $MacroKeys['Pause'] = 0x13; $MacroKeys['Scroll Lock'] = 0x91
-$MacroRepeats = [ordered]@{ 'Once' = 1; '2 times' = 2; '3 times' = 3; '5 times' = 5; '10 times' = 10; '25 times' = 25; '100 times' = 100; 'Until hotkey pressed again' = 0 }
+$MacroButtonNames = @{ Left = '{LMouse}'; Right = '{RMouse}'; Middle = '{MMouse}'; X1 = '{Mouse4}'; X2 = '{Mouse5}' }
+$StopRecordVk = 0x77   # F8
+$Invariant = [System.Globalization.CultureInfo]::InvariantCulture
 $MacroSpeeds = [ordered]@{ '0.25x' = 0.25; '0.5x' = 0.5; '1x' = 1.0; '1.5x' = 1.5; '2x' = 2.0; '4x' = 4.0 }
+$OemNames = @{ 0xBA = ';'; 0xBB = '='; 0xBC = ','; 0xBD = '-'; 0xBE = '.'; 0xBF = '/'; 0xC0 = '`'; 0xDB = '['; 0xDC = '\'; 0xDD = ']'; 0xDE = "'" }
+
+# Hotkey names used by v1.2.0 macro files.
+$LegacyHotkeys = @{}
+foreach ($i in 1..24) { $LegacyHotkeys["F$i"] = 0x6F + $i }
+foreach ($i in 0..9) { $LegacyHotkeys["Numpad $i"] = 0x60 + $i }
+$LegacyHotkeys['Numpad *'] = 0x6A; $LegacyHotkeys['Numpad +'] = 0x6B; $LegacyHotkeys['Numpad -'] = 0x6D; $LegacyHotkeys['Numpad /'] = 0x6F
+$LegacyHotkeys['Numpad .'] = 0x6E; $LegacyHotkeys['Insert'] = 0x2D; $LegacyHotkeys['Home'] = 0x24; $LegacyHotkeys['Page Up'] = 0x21
+$LegacyHotkeys['Delete'] = 0x2E; $LegacyHotkeys['End'] = 0x23; $LegacyHotkeys['Page Down'] = 0x22; $LegacyHotkeys['Pause'] = 0x13; $LegacyHotkeys['Scroll Lock'] = 0x91
 
 function Initialize-MacroEngine {
     if ($script:MacroEngineReady) { return $true }
@@ -2469,55 +2543,79 @@ function Initialize-MacroEngine {
     $script:MacroEngineReady
 }
 
-function New-MacroObject([string]$Name) {
-    [pscustomobject]@{ Name = $Name; Hotkey = 'None'; Repeat = 1; Speed = 1.0; MousePositions = $false; Events = @() }
+function Get-KeyName([int]$Vk) {
+    if ($Vk -le 0) { return '(none)' }
+    if ($OemNames.ContainsKey($Vk)) { return $OemNames[$Vk] }
+    if ($Vk -ge 0x41 -and $Vk -le 0x5A) { return [string][char]($Vk + 32) }   # a-z
+    if ($Vk -ge 0x30 -and $Vk -le 0x39) { return [string][char]$Vk }          # 0-9
+    if ($Vk -ge 0x60 -and $Vk -le 0x69) { return "Numpad $($Vk - 0x60)" }
+    $k = [System.Windows.Input.KeyInterop]::KeyFromVirtualKey($Vk)
+    if ("$k" -eq 'None') { "VK $Vk" } else { "$k" }
 }
 
-function Get-UniqueMacroName([string]$Base) {
-    $names = @($Macros | ForEach-Object Name)
+function New-Step([string]$Type, [int]$T = 0, [int]$Key = 0, [string]$Button, [int]$X = 0, [int]$Y = 0, [int]$Delta = 0, [bool]$Pos = $false) {
+    [pscustomobject]@{ Type = $Type; T = $T; Key = $Key; Button = $(if ($Button) { $Button } else { $null }); X = $X; Y = $Y; Delta = $Delta; Pos = $Pos }
+}
+
+function New-MacroObject([string]$Name) {
+    [pscustomobject]@{ Name = $Name; HotkeyVk = 0; Repeat = 1; Speed = 1.0; Events = @() }
+}
+
+function Copy-Macro($M) {
+    [pscustomobject]@{
+        Name = $M.Name; HotkeyVk = $M.HotkeyVk; Repeat = $M.Repeat; Speed = $M.Speed
+        Events = @(@($M.Events) | ForEach-Object { New-Step $_.Type $_.T $_.Key $_.Button $_.X $_.Y $_.Delta $_.Pos })
+    }
+}
+
+function Get-UniqueMacroName([string]$Base, [int]$Except = -1) {
+    $names = @(for ($i = 0; $i -lt $Macros.Count; $i++) { if ($i -ne $Except) { $Macros[$i].Name } })
     if ($names -notcontains $Base) { return $Base }
     $n = 2
     while ($names -contains "$Base ($n)") { $n++ }
     "$Base ($n)"
 }
 
-# Turns untrusted JSON (imports, the saved file) into a clean macro. Only known step types and numbers survive.
+# Turns untrusted JSON (imports and the saved file) into a clean macro: only known step types and numbers survive.
+# Older files stored the wait on every step; that becomes a separate Delay step.
 function ConvertFrom-MacroJson($Obj) {
+    $legacyPos = [bool]$Obj.MousePositions
     $steps = foreach ($e in @($Obj.Events)) {
         if (-not $e -or $MacroStepTypes -notcontains [string]$e.Type) { continue }
-        [pscustomobject]@{
-            T      = [math]::Min([math]::Max(0, [int]$e.T), 3600000)
-            Type   = [string]$e.Type
-            Key    = [math]::Min([math]::Max(0, [int]$e.Key), 255)
-            Button = if ($MacroButtons -contains [string]$e.Button) { [string]$e.Button } else { $null }
-            X      = [int]$e.X; Y = [int]$e.Y; Delta = [int]$e.Delta
-        }
+        $t = [math]::Min([math]::Max(0, [int]$e.T), 3600000)
+        if ($e.Type -eq 'Delay') { New-Step 'Delay' $t; continue }
+        if ($t -gt 0) { New-Step 'Delay' $t }
+        $button = if ($MacroButtons -contains [string]$e.Button) { [string]$e.Button } else { $null }
+        if ($e.Type -like 'Mouse*' -and -not $button) { continue }
+        New-Step ([string]$e.Type) 0 ([math]::Min([math]::Max(0, [int]$e.Key), 254)) $button ([int]$e.X) ([int]$e.Y) ([int]$e.Delta) ([bool]$e.Pos -or ($legacyPos -and $e.Type -like 'Mouse*'))
     }
-    $hotkey = [string]$Obj.Hotkey
+    $vk = [int]$Obj.HotkeyVk
+    if (-not $vk -and $Obj.Hotkey -and $LegacyHotkeys.ContainsKey([string]$Obj.Hotkey)) { $vk = $LegacyHotkeys[[string]$Obj.Hotkey] }
+    if ($vk -lt 1 -or $vk -gt 254 -or $vk -eq $StopRecordVk) { $vk = 0 }
+    $repeat = if ($null -ne $Obj.Repeat) { [math]::Min([math]::Max(0, [int]$Obj.Repeat), 9999) } else { 1 }
     $speed = [double]$Obj.Speed
     [pscustomobject]@{
-        Name           = if ("$($Obj.Name)".Trim()) { "$($Obj.Name)".Trim() } else { 'Imported macro' }
-        Hotkey         = if ($hotkey -and $MacroKeys.Contains($hotkey)) { $hotkey } else { 'None' }
-        Repeat         = [math]::Max(0, [int]$Obj.Repeat)
-        Speed          = if ($speed -ge 0.1 -and $speed -le 10) { $speed } else { 1.0 }
-        MousePositions = [bool]$Obj.MousePositions
-        Events         = @($steps)
+        Name     = if ("$($Obj.Name)".Trim()) { "$($Obj.Name)".Trim() } else { 'Imported macro' }
+        HotkeyVk = $vk
+        Repeat   = $repeat
+        Speed    = if ($speed -ge 0.1 -and $speed -le 10) { $speed } else { 1.0 }
+        Events   = @($steps)
     }
 }
 
 function ConvertTo-EngineMacro($M) {
     $em = New-Object Peak.Macro
-    $em.Name = $M.Name; $em.Repeat = $M.Repeat; $em.Speed = $M.Speed; $em.UsePositions = $M.MousePositions
+    $em.Name = $M.Name; $em.Repeat = $M.Repeat; $em.Speed = $M.Speed
     foreach ($e in @($M.Events)) {
         $s = New-Object Peak.MacroEvent
-        $s.T = $e.T; $s.Type = $e.Type; $s.Key = $e.Key; $s.Button = $e.Button; $s.X = $e.X; $s.Y = $e.Y; $s.Delta = $e.Delta
+        $s.T = $e.T; $s.Type = $e.Type; $s.Key = $e.Key; $s.Button = $e.Button; $s.X = $e.X; $s.Y = $e.Y; $s.Delta = $e.Delta; $s.Pos = $e.Pos
         $em.Events.Add($s)
     }
     $em
 }
 
 function Save-Macros {
-    try { ConvertTo-Json -InputObject @{ PeakMacros = 1; Macros = @($Macros) } -Depth 6 | Set-Content -Path $MacroFile -Encoding UTF8 }
+    try { ConvertTo-Json -InputObject @{ PeakMacros = 2; Macros = @($Macros) } -Depth 6 | Set-Content -Path $MacroFile -Encoding UTF8 }
     catch { Write-Log "Could not save macros: $($_.Exception.Message)" 'ERROR' }
 }
 
@@ -2530,92 +2628,272 @@ function Read-MacroFile([string]$Path) {
 
 function Update-MacroBindings {
     if (-not $script:MacroEngineReady) { return }
-    $bound = @($Macros | Where-Object { $MacroKeys[[string]$_.Hotkey] -gt 0 -and @($_.Events).Count -gt 0 })
-    [Peak.MacroEngine]::SetBindings([int[]]@($bound | ForEach-Object { $MacroKeys[[string]$_.Hotkey] }), [Peak.Macro[]]@($bound | ForEach-Object { ConvertTo-EngineMacro $_ }))
+    $bound = @($Macros | Where-Object { $_.HotkeyVk -gt 0 -and @($_.Events).Count -gt 0 })
+    [Peak.MacroEngine]::SetBindings([int[]]@($bound | ForEach-Object { $_.HotkeyVk }), [Peak.Macro[]]@($bound | ForEach-Object { ConvertTo-EngineMacro $_ }))
 }
 
-function Get-SelectedMacro {
+# ---------- macro list and the editing draft (changes apply on Save, like OK/Cancel) ----------
+function Update-MacroList([int]$SelectIndex = -1) {
+    $script:SuppressMacroList = $true
+    try {
+        $ui.LstMacros.Items.Clear()
+        foreach ($m in $Macros) {
+            $key = if ($m.HotkeyVk) { "   [$(Get-KeyName $m.HotkeyVk)]" } else { '' }
+            [void]$ui.LstMacros.Items.Add("$($m.Name)$key")
+        }
+        $ui.LstMacros.SelectedIndex = $SelectIndex
+    } finally { $script:SuppressMacroList = $false }
+}
+
+function Set-DraftDirty([bool]$Dirty) {
+    $script:DraftDirty = $Dirty
+    $ui.BtnMacroSave.IsEnabled = $Dirty
+    $ui.BtnMacroCancel.IsEnabled = $Dirty
+}
+
+function Open-Draft {
     $i = $ui.LstMacros.SelectedIndex
-    if ($i -ge 0 -and $i -lt $Macros.Count) { $Macros[$i] }
+    if ($i -ge 0 -and $i -lt $Macros.Count) { $script:Draft = Copy-Macro $Macros[$i]; $script:DraftIndex = $i }
+    else { $script:Draft = $null; $script:DraftIndex = -1 }
+    Set-DraftDirty $false
+    Show-MacroEditor
 }
 
-function Update-MacroList($Select) {
-    $ui.LstMacros.Items.Clear()
-    foreach ($m in $Macros) {
-        $key = if ($m.Hotkey -ne 'None') { "  [$($m.Hotkey)]" } else { '' }
-        [void]$ui.LstMacros.Items.Add("$($m.Name)$key  -  $(@($m.Events).Count) steps")
+function Save-Draft {
+    $d = $script:Draft
+    if (-not $d -or $script:DraftIndex -lt 0) { return }
+    $d.Name = Get-UniqueMacroName ($(if ($d.Name.Trim()) { $d.Name.Trim() } else { 'Macro' })) $script:DraftIndex
+    if ($d.HotkeyVk) {
+        for ($i = 0; $i -lt $Macros.Count; $i++) {
+            if ($i -ne $script:DraftIndex -and $Macros[$i].HotkeyVk -eq $d.HotkeyVk) {
+                $Macros[$i].HotkeyVk = 0
+                Write-Log "$(Get-KeyName $d.HotkeyVk) was moved from '$($Macros[$i].Name)' to '$($d.Name)'."
+            }
+        }
     }
-    if ($Select) { $ui.LstMacros.SelectedIndex = $Macros.IndexOf($Select) }
-    if ($ui.LstMacros.SelectedIndex -lt 0) { Show-MacroEditor }
+    $Macros[$script:DraftIndex] = Copy-Macro $d
+    Save-Macros
+    Update-MacroBindings
+    Update-MacroList $script:DraftIndex
+    Set-DraftDirty $false
+    Show-MacroEditor
+    Write-Log "Saved macro '$($d.Name)'."
 }
 
-function Get-KeyName([int]$Vk) {
-    $k = [System.Windows.Input.KeyInterop]::KeyFromVirtualKey($Vk)
-    if ("$k" -eq 'None') { "VK $Vk" } else { "$k" }
+# Asks to save unsaved edits before switching away from the current macro.
+function Confirm-DraftSaved {
+    if (-not ($script:DraftDirty -and $script:Draft)) { return }
+    $ok = [System.Windows.MessageBox]::Show("Save your changes to '$($script:Draft.Name)'?", $AppName, 'YesNo', 'Question')
+    if ($ok -eq 'Yes') { Save-Draft } else { Set-DraftDirty $false }
 }
 
-function Format-MacroStep($E, [bool]$Positions) {
-    $at = if ($Positions) { " at ($($E.X), $($E.Y))" } else { '' }
-    $what = switch ($E.Type) {
-        'KeyDown' { "Key $(Get-KeyName $E.Key) down" }
-        'KeyUp' { "Key $(Get-KeyName $E.Key) up" }
-        'MouseDown' { "Mouse $($E.Button) down$at" }
-        'MouseUp' { "Mouse $($E.Button) up$at" }
-        'Move' { "Move to ($($E.X), $($E.Y))" }
-        'Wheel' { 'Scroll ' + $(if ($E.Delta -gt 0) { 'up' } else { 'down' }) }
+function Format-MacroStep($E) {
+    $label, $action = switch ($E.Type) {
+        'Delay' { [string]::Format($Invariant, '{0:0.###}', $E.T / 1000), 'Delay' }
+        'KeyDown' { (Get-KeyName $E.Key), 'Hold' }
+        'KeyUp' { (Get-KeyName $E.Key), 'Release' }
+        'MouseDown' { $MacroButtonNames[[string]$E.Button], ('Hold' + $(if ($E.Pos) { "   at $($E.X), $($E.Y)" })) }
+        'MouseUp' { $MacroButtonNames[[string]$E.Button], ('Release' + $(if ($E.Pos) { "   at $($E.X), $($E.Y)" })) }
+        'Move' { '{Move}', "$($E.X), $($E.Y)" }
+        'Wheel' { '{Wheel}', $(if ($E.Delta -gt 0) { 'Up' } else { 'Down' }) }
     }
-    'wait {0,6} ms   {1}' -f $E.T, $what
+    '{0,-14} {1}' -f $label, $action
+}
+
+function Show-MacroSteps([int]$Select = -1) {
+    $script:LoadingMacro = $true
+    try {
+        $ui.LstMacroSteps.Items.Clear()
+        if (-not $script:Draft) { $ui.TxtMacroSummary.Text = 'Select a macro, or click New.'; return }
+        $steps = @($script:Draft.Events)
+        foreach ($e in $steps) { [void]$ui.LstMacroSteps.Items.Add((Format-MacroStep $e)) }
+        $ui.LstMacroSteps.SelectedIndex = [math]::Min($Select, $steps.Count - 1)
+        if ($ui.LstMacroSteps.SelectedIndex -ge 0) { $ui.LstMacroSteps.ScrollIntoView($ui.LstMacroSteps.SelectedItem) }
+        $ms = (@($steps | Where-Object Type -eq 'Delay') | Measure-Object T -Sum).Sum
+        $ui.TxtMacroSummary.Text = [string]::Format($Invariant, '{0} steps, {1:0.##} s per run', $steps.Count, $ms / 1000) +
+            $(if ($script:DraftDirty) { '  -  unsaved changes' } else { '' })
+    } finally { $script:LoadingMacro = $false }
+    Sync-DelayBox
 }
 
 function Show-MacroEditor {
-    $m = Get-SelectedMacro
+    $d = $script:Draft
     $script:LoadingMacro = $true
     try {
-        $ui.MacroEditor.IsEnabled = [bool]$m
-        $ui.LstMacroSteps.Items.Clear()
-        if (-not $m) { $ui.TxtMacroName.Text = ''; $ui.TxtMacroSummary.Text = 'Select a macro, or click Record New.'; return }
-        $ui.TxtMacroName.Text = $m.Name
-        $ui.CmbMacroHotkey.SelectedItem = [string]$m.Hotkey
-        $ui.CmbMacroRepeat.SelectedItem = @($MacroRepeats.Keys | Where-Object { $MacroRepeats[$_] -eq $m.Repeat })[0]
-        if ($ui.CmbMacroRepeat.SelectedIndex -lt 0) { $ui.CmbMacroRepeat.SelectedIndex = 0 }
-        $ui.CmbMacroSpeed.SelectedItem = @($MacroSpeeds.Keys | Where-Object { $MacroSpeeds[$_] -eq $m.Speed })[0]
+        $ui.MacroEditor.IsEnabled = [bool]$d
+        if (-not $d) { $ui.TxtMacroName.Text = ''; $ui.TxtMacroBound.Text = '(none)'; return }
+        $ui.TxtMacroName.Text = $d.Name
+        $ui.TxtMacroBound.Text = Get-KeyName $d.HotkeyVk
+        $ui.RbMacroOnce.IsChecked = $d.Repeat -eq 1
+        $ui.RbMacroLoop.IsChecked = $d.Repeat -eq 0
+        $ui.RbMacroRepeat.IsChecked = $d.Repeat -gt 1
+        if ($d.Repeat -gt 1) { $ui.TxtRepeatCount.Text = "$($d.Repeat)" }
+        $ui.TxtRepeatCount.IsEnabled = $d.Repeat -gt 1
+        $ui.CmbMacroSpeed.SelectedItem = @($MacroSpeeds.Keys | Where-Object { $MacroSpeeds[$_] -eq $d.Speed })[0]
         if ($ui.CmbMacroSpeed.SelectedIndex -lt 0) { $ui.CmbMacroSpeed.SelectedItem = '1x' }
-        $steps = @($m.Events)
-        $shown = [math]::Min($steps.Count, 500)
-        for ($i = 0; $i -lt $shown; $i++) { [void]$ui.LstMacroSteps.Items.Add((Format-MacroStep $steps[$i] $m.MousePositions)) }
-        if ($steps.Count -gt $shown) { [void]$ui.LstMacroSteps.Items.Add("... $($steps.Count - $shown) more steps") }
-        $ms = ($steps | Measure-Object T -Sum).Sum
-        $ui.TxtMacroSummary.Text = '{0} steps, {1:N1} s long. {2}' -f $steps.Count, ($ms / 1000),
-            $(if ($m.MousePositions) { 'Moves the cursor to the recorded positions.' } else { 'Clicks wherever the cursor is.' })
     } finally { $script:LoadingMacro = $false }
+    Show-MacroSteps 0
 }
 
+function Set-DraftChanged([int]$Select = $ui.LstMacroSteps.SelectedIndex) {
+    Set-DraftDirty $true
+    Show-MacroSteps $Select
+}
+
+# ---------- steps ----------
+function Get-SelectedStepIndex {
+    $i = $ui.LstMacroSteps.SelectedIndex
+    if ($script:Draft -and $i -ge 0 -and $i -lt @($script:Draft.Events).Count) { $i } else { -1 }
+}
+
+function Add-MacroSteps([object[]]$New, [int]$At = -1) {
+    if (-not $script:Draft -or -not $New) { return }
+    $list = [System.Collections.ArrayList]@($script:Draft.Events)
+    if ($At -lt 0) { $sel = Get-SelectedStepIndex; $At = if ($sel -ge 0) { $sel + 1 } else { $list.Count } }
+    $At = [math]::Min($At, $list.Count)
+    $list.InsertRange($At, $New)
+    $script:Draft.Events = $list.ToArray()
+    Set-DraftChanged ($At + $New.Count - 1)
+}
+
+function ConvertFrom-DelayText([string]$Text) {
+    $v = 0.0
+    if (-not [double]::TryParse($Text.Trim().Replace(',', '.'), [System.Globalization.NumberStyles]::Float, $Invariant, [ref]$v)) { return $null }
+    [int][math]::Round([math]::Min([math]::Max(0.0, $v), 3600.0) * 1000)
+}
+
+# The Delay box edits the selected Delay step; otherwise it is the length used by Insert > Delay.
+function Sync-DelayBox {
+    $i = Get-SelectedStepIndex
+    if ($i -ge 0 -and $script:Draft.Events[$i].Type -eq 'Delay') {
+        $script:LoadingMacro = $true
+        try { $ui.TxtDelay.Text = [string]::Format($Invariant, '{0:0.###}', $script:Draft.Events[$i].T / 1000) } finally { $script:LoadingMacro = $false }
+    }
+}
+
+function Set-DelayFromBox {
+    $ms = ConvertFrom-DelayText $ui.TxtDelay.Text
+    $i = Get-SelectedStepIndex
+    if ($null -eq $ms -or $i -lt 0 -or $script:Draft.Events[$i].Type -ne 'Delay' -or $script:Draft.Events[$i].T -eq $ms) { return }
+    $script:Draft.Events[$i].T = $ms
+    Set-DirtyKeepCaret
+    # Update just that row without re-syncing the box, so the text being typed is left alone.
+    $script:LoadingMacro = $true
+    try {
+        $ui.LstMacroSteps.Items[$i] = Format-MacroStep $script:Draft.Events[$i]
+        $ui.LstMacroSteps.SelectedIndex = $i
+    } finally { $script:LoadingMacro = $false }
+}
+function Set-DirtyKeepCaret { if (-not $script:DraftDirty) { Set-DraftDirty $true } }
+
+function Step-DelayBox([double]$By) {
+    $ms = ConvertFrom-DelayText $ui.TxtDelay.Text
+    if ($null -eq $ms) { $ms = 0 }
+    $ui.TxtDelay.Text = [string]::Format($Invariant, '{0:0.###}', [math]::Max(0.0, $ms / 1000 + $By))
+}
+
+# ---------- key capture (Bind to Key, Insert key steps) ----------
+function Start-KeyCapture([string]$Mode, [string]$Prompt) {
+    $script:KeyCapture = $Mode
+    $ui.TxtMacroState.Text = "$Prompt  (Esc cancels)"
+    $window.Focus() | Out-Null
+}
+
+$window.Add_PreviewKeyDown({
+    param($s, $e)
+    if (-not $script:KeyCapture) { return }
+    $e.Handled = $true
+    $key = if ("$($e.Key)" -eq 'System') { $e.SystemKey } else { $e.Key }
+    $mode = $script:KeyCapture
+    $script:KeyCapture = $null
+    $ui.TxtMacroState.Text = ''
+    $vk = [System.Windows.Input.KeyInterop]::VirtualKeyFromKey($key)
+    if ($script:Draft) { $ui.TxtMacroBound.Text = Get-KeyName $script:Draft.HotkeyVk }
+    if ("$key" -eq 'Escape' -or $vk -le 0 -or -not $script:Draft) { return }
+    switch ($mode) {
+        'Bind' {
+            if ("$key" -eq 'Back') { $script:Draft.HotkeyVk = 0 }
+            elseif ($vk -eq $StopRecordVk) { [System.Windows.MessageBox]::Show('F8 is reserved for stopping a recording. Pick another key.', $AppName) | Out-Null; return }
+            else {
+                $script:Draft.HotkeyVk = $vk
+                if (($vk -ge 0x30 -and $vk -le 0x5A) -or $vk -eq 0x20) {
+                    Write-Log "Note: while macro hotkeys are on, '$(Get-KeyName $vk)' is used only to start/stop this macro and won't type in other apps."
+                }
+            }
+            $ui.TxtMacroBound.Text = Get-KeyName $script:Draft.HotkeyVk
+            Set-DraftChanged
+        }
+        'Press' { Add-MacroSteps @((New-Step 'KeyDown' -Key $vk), (New-Step 'KeyUp' -Key $vk)) }
+        'Hold' { Add-MacroSteps @(New-Step 'KeyDown' -Key $vk) }
+        'Release' { Add-MacroSteps @(New-Step 'KeyUp' -Key $vk) }
+    }
+})
+
+# ---------- Insert >> menu ----------
+$InsertMenu = New-Object System.Windows.Controls.ContextMenu
+function Add-InsertItem($Parent, [string]$Header, $Tag) {
+    $item = New-Object System.Windows.Controls.MenuItem
+    $item.Header = $Header
+    if ($null -ne $Tag) {
+        $item.Tag = $Tag
+        $item.Add_Click({ param($s, $e); Invoke-InsertItem $s.Tag })
+    }
+    [void]$Parent.Items.Add($item)
+    $item
+}
+function Invoke-InsertItem($Tag) {
+    switch ($Tag.Kind) {
+        'Key' { Start-KeyCapture $Tag.Mode $Tag.Prompt }
+        'Delay' {
+            $ms = ConvertFrom-DelayText $ui.TxtDelay.Text
+            Add-MacroSteps @(New-Step 'Delay' $(if ($null -ne $ms) { $ms } else { 50 }))
+        }
+        'Click' { Add-MacroSteps @((New-Step 'MouseDown' -Button $Tag.Button), (New-Step 'MouseUp' -Button $Tag.Button)) }
+        'MouseHold' { Add-MacroSteps @(New-Step 'MouseDown' -Button $Tag.Button) }
+        'MouseRelease' { Add-MacroSteps @(New-Step 'MouseUp' -Button $Tag.Button) }
+        'Wheel' { Add-MacroSteps @(New-Step 'Wheel' -Delta $Tag.Delta) }
+    }
+}
+[void](Add-InsertItem $InsertMenu 'Key press (hold + release)...' @{ Kind = 'Key'; Mode = 'Press'; Prompt = 'Press the key to insert.' })
+[void](Add-InsertItem $InsertMenu 'Key hold...' @{ Kind = 'Key'; Mode = 'Hold'; Prompt = 'Press the key to hold.' })
+[void](Add-InsertItem $InsertMenu 'Key release...' @{ Kind = 'Key'; Mode = 'Release'; Prompt = 'Press the key to release.' })
+[void]$InsertMenu.Items.Add((New-Object System.Windows.Controls.Separator))
+[void](Add-InsertItem $InsertMenu 'Delay (length from the Delay box)' @{ Kind = 'Delay' })
+[void]$InsertMenu.Items.Add((New-Object System.Windows.Controls.Separator))
+foreach ($group in @(@('Mouse click', 'Click'), @('Mouse hold', 'MouseHold'), @('Mouse release', 'MouseRelease'))) {
+    $sub = Add-InsertItem $InsertMenu $group[0] $null
+    foreach ($b in $MacroButtons) { [void](Add-InsertItem $sub $MacroButtonNames[$b] @{ Kind = $group[1]; Button = $b }) }
+}
+[void](Add-InsertItem $InsertMenu 'Scroll up' @{ Kind = 'Wheel'; Delta = 120 })
+[void](Add-InsertItem $InsertMenu 'Scroll down' @{ Kind = 'Wheel'; Delta = -120 })
+
+# ---------- recording / playback state ----------
 function Update-MacroState {
     $engine = [Peak.MacroEngine]
     $done = $engine::TakeRecording()
     if ($null -ne $done) { Complete-MacroRecording $done }
-    $ui.BtnMacroNew.Content = if ($engine::IsRecording) { 'Stop Recording' } else { 'Record New' }
-    if ($script:MacroCountdown -gt 0) { return }
-    $ui.TxtMacroState.Text = if ($engine::IsRecording) { "Recording... $($engine::RecordedCount) steps so far. Press F8 to stop." }
+    $recording = $engine::IsRecording
+    $busy = $recording -or $script:MacroCountdown -gt 0
+    $ui.BtnMacroStartRec.IsEnabled = -not $busy -and -not $engine::IsPlaying
+    $ui.BtnMacroStopRec.IsEnabled = $busy
+    $ui.LstMacros.IsEnabled = -not $busy
+    if ($script:MacroCountdown -gt 0 -or $script:KeyCapture) { return }
+    $ui.TxtMacroState.Text = if ($recording) { "Recording... $($engine::RecordedCount) steps so far. Press F8 to stop." }
     elseif ($engine::IsPlaying) { "Playing '$($engine::PlayingName)'. Press its hotkey again or click Stop to end it." }
-    elseif ($ui.ChkMacrosEnabled.IsChecked) { 'Hotkeys on: press a macro''s hotkey in any app or game to start or stop it.' }
-    else { 'Hotkeys off. Turn them on to play macros with their hotkeys.' }
+    elseif ($ui.ChkMacrosEnabled.IsChecked) { 'Stopped. Hotkeys on: press a macro''s key in any app or game to start or stop it.' }
+    else { 'Stopped. Turn hotkeys on to play saved macros with their keys.' }
 }
 
-function Complete-MacroRecording($Steps) {
-    $events = @($Steps | ForEach-Object { [pscustomobject]@{ T = $_.T; Type = $_.Type; Key = $_.Key; Button = $_.Button; X = $_.X; Y = $_.Y; Delta = $_.Delta } })
-    if (-not $events) { Write-Log 'The recording was empty, so nothing was saved.' 'WARN'; return }
-    $m = $script:RecordTarget
-    if (-not $m) {
-        $m = New-MacroObject (Get-UniqueMacroName 'New macro')
-        [void]$Macros.Add($m)
+function Complete-MacroRecording($Recorded) {
+    $d = $script:RecordDraft
+    if (-not $d -or $d -ne $script:Draft) { Write-Log 'The recording finished after the macro was closed, so it was not added.' 'WARN'; return }
+    $new = foreach ($r in $Recorded) {
+        if ($script:RecordDelays -and $r.T -gt 0) { New-Step 'Delay' $r.T }
+        New-Step $r.Type 0 $r.Key $r.Button $r.X $r.Y $r.Delta $r.Pos
     }
-    $m.Events = $events
-    $m.MousePositions = [bool]$script:RecordMoves
-    Save-Macros
-    Update-MacroList -Select $m
-    Update-MacroBindings
-    Write-Log "Recorded '$($m.Name)': $($events.Count) steps."
+    if (-not $new) { Write-Log 'Nothing was recorded.' 'WARN'; return }
+    Add-MacroSteps @($new) $script:RecordInsertAt
+    Write-Log "Recorded $(@($new).Count) steps into '$($d.Name)'. Click Save to keep them."
 }
 
 # 3 second countdown so the player can switch to the game before recording or playback starts.
@@ -2636,26 +2914,24 @@ function Start-MacroCountdown([string]$Label, [scriptblock]$Action) {
     $MacroTimer.Start()
 }
 
-function Start-MacroRecording($Target) {
-    if (-not (Initialize-MacroEngine)) { return }
-    if ([Peak.MacroEngine]::IsPlaying -or $script:MacroCountdown -gt 0) { return }
-    $script:RecordTarget = $Target
-    $script:RecordMoves = [bool]$ui.ChkRecordMoves.IsChecked
-    Start-MacroCountdown 'Recording starts' { [Peak.MacroEngine]::StartRecording($script:RecordMoves) }
-}
-
-# Load saved macros
+# ---------- load saved macros and fill the controls ----------
 $Macros = New-Object System.Collections.ArrayList
 if (Test-Path $MacroFile) {
     try { foreach ($m in Read-MacroFile $MacroFile) { [void]$Macros.Add($m) } }
     catch { Write-Log "Could not read saved macros: $($_.Exception.Message)" 'WARN' }
 }
-foreach ($k in $MacroKeys.Keys) { [void]$ui.CmbMacroHotkey.Items.Add($k) }
-foreach ($k in $MacroRepeats.Keys) { [void]$ui.CmbMacroRepeat.Items.Add($k) }
 foreach ($k in $MacroSpeeds.Keys) { [void]$ui.CmbMacroSpeed.Items.Add($k) }
+$Draft = $null; $DraftIndex = -1; $DraftDirty = $false; $KeyCapture = $null
 Update-MacroList
+Open-Draft
 
-$ui.LstMacros.Add_SelectionChanged({ Show-MacroEditor })
+# ---------- events ----------
+$ui.LstMacros.Add_SelectionChanged({
+    if ($script:SuppressMacroList) { return }
+    $target = $ui.LstMacros.SelectedIndex
+    if ($script:DraftDirty) { Confirm-DraftSaved; Update-MacroList $target }
+    Open-Draft
+})
 
 $ui.ChkMacrosEnabled.Add_Click({
     if (-not (Initialize-MacroEngine)) { $ui.ChkMacrosEnabled.IsChecked = $false; return }
@@ -2665,102 +2941,147 @@ $ui.ChkMacrosEnabled.Add_Click({
 })
 
 $ui.BtnMacroNew.Add_Click({
-    if ($script:MacroEngineReady -and [Peak.MacroEngine]::IsRecording) { [Peak.MacroEngine]::EndRecording($true); return }
-    Start-MacroRecording $null
-})
-$ui.BtnMacroRerecord.Add_Click({
-    $m = Get-SelectedMacro
-    if (-not $m) { return }
-    $ok = [System.Windows.MessageBox]::Show("Replace the steps in '$($m.Name)' with a new recording?", $AppName, 'YesNo')
-    if ($ok -eq 'Yes') { Start-MacroRecording $m }
-})
-
-$ui.BtnMacroPlay.Add_Click({
-    $m = Get-SelectedMacro
-    if (-not $m -or -not @($m.Events).Count -or -not (Initialize-MacroEngine)) { return }
-    if ([Peak.MacroEngine]::IsPlaying -or [Peak.MacroEngine]::IsRecording -or $script:MacroCountdown -gt 0) { return }
-    $script:PendingPlay = ConvertTo-EngineMacro $m
-    $script:PendingPlay.Repeat = 1   # a test always plays once
-    Start-MacroCountdown "Playing '$($m.Name)'" { [Peak.MacroEngine]::Play($script:PendingPlay) }
-})
-$ui.BtnMacroStop.Add_Click({
-    if ($script:MacroCountdown -gt 0) { $MacroTimer.Stop(); $script:MacroCountdown = 0 }
-    if ($script:MacroEngineReady) { [Peak.MacroEngine]::StopPlayback(); if ([Peak.MacroEngine]::IsRecording) { [Peak.MacroEngine]::EndRecording($true) } }
-})
-
-$ui.TxtMacroName.Add_LostFocus({
-    $m = Get-SelectedMacro
-    if ($script:LoadingMacro -or -not $m) { return }
-    $name = $ui.TxtMacroName.Text.Trim()
-    if (-not $name -or $name -eq $m.Name) { $ui.TxtMacroName.Text = $m.Name; return }
-    $m.Name = Get-UniqueMacroName $name
-    Save-Macros; Update-MacroList -Select $m; Update-MacroBindings
-})
-$ui.CmbMacroHotkey.Add_SelectionChanged({
-    $m = Get-SelectedMacro
-    if ($script:LoadingMacro -or -not $m -or -not $ui.CmbMacroHotkey.SelectedItem) { return }
-    $key = [string]$ui.CmbMacroHotkey.SelectedItem
-    if ($key -ne 'None') {
-        foreach ($other in $Macros) {
-            if ($other -ne $m -and $other.Hotkey -eq $key) { $other.Hotkey = 'None'; Write-Log "$key was moved from '$($other.Name)' to '$($m.Name)'." }
-        }
-    }
-    $m.Hotkey = $key
-    Save-Macros; Update-MacroList -Select $m; Update-MacroBindings
-})
-$ui.CmbMacroRepeat.Add_SelectionChanged({
-    $m = Get-SelectedMacro
-    if ($script:LoadingMacro -or -not $m -or -not $ui.CmbMacroRepeat.SelectedItem) { return }
-    $m.Repeat = $MacroRepeats[[string]$ui.CmbMacroRepeat.SelectedItem]
-    Save-Macros; Update-MacroBindings
-})
-$ui.CmbMacroSpeed.Add_SelectionChanged({
-    $m = Get-SelectedMacro
-    if ($script:LoadingMacro -or -not $m -or -not $ui.CmbMacroSpeed.SelectedItem) { return }
-    $m.Speed = $MacroSpeeds[[string]$ui.CmbMacroSpeed.SelectedItem]
-    Save-Macros; Update-MacroBindings
-})
-
-$ui.BtnMacroDeleteStep.Add_Click({
-    $m = Get-SelectedMacro
-    $i = $ui.LstMacroSteps.SelectedIndex
-    if (-not $m -or $i -lt 0 -or $i -ge @($m.Events).Count) { return }
-    $steps = [System.Collections.ArrayList]@($m.Events)
-    $steps.RemoveAt($i)
-    $m.Events = $steps.ToArray()
-    Save-Macros; Update-MacroBindings
-    Update-MacroList -Select $m
-    $ui.LstMacroSteps.SelectedIndex = [math]::Min($i, $ui.LstMacroSteps.Items.Count - 1)
+    Confirm-DraftSaved
+    [void]$Macros.Add((New-MacroObject (Get-UniqueMacroName 'New macro')))
+    Save-Macros
+    Update-MacroList ($Macros.Count - 1)
+    Open-Draft
+    $ui.TxtMacroName.Focus() | Out-Null
+    $ui.TxtMacroName.SelectAll()
 })
 
 $ui.BtnMacroDelete.Add_Click({
-    $m = Get-SelectedMacro
-    if (-not $m) { return }
-    $ok = [System.Windows.MessageBox]::Show("Delete the macro '$($m.Name)'?", $AppName, 'YesNo', 'Warning')
+    $i = $script:DraftIndex
+    if ($i -lt 0) { return }
+    $ok = [System.Windows.MessageBox]::Show("Delete the macro '$($Macros[$i].Name)'?", $AppName, 'YesNo', 'Warning')
     if ($ok -ne 'Yes') { return }
-    $Macros.Remove($m)
-    Save-Macros; Update-MacroList; Update-MacroBindings
-    Write-Log "Deleted macro '$($m.Name)'."
+    $name = $Macros[$i].Name
+    $Macros.RemoveAt($i)
+    Save-Macros; Update-MacroBindings
+    Update-MacroList ([math]::Min($i, $Macros.Count - 1))
+    Open-Draft
+    Write-Log "Deleted macro '$name'."
 })
 
+$ui.BtnMacroSave.Add_Click({ Save-Draft })
+$ui.BtnMacroCancel.Add_Click({ Open-Draft; Write-Log 'Changes discarded.' })
+
+$ui.TxtMacroName.Add_TextChanged({
+    if ($script:LoadingMacro -or -not $script:Draft) { return }
+    $script:Draft.Name = $ui.TxtMacroName.Text
+    Set-DirtyKeepCaret
+})
+
+$ui.BtnMacroStartRec.Add_Click({
+    if (-not $script:Draft -or -not (Initialize-MacroEngine)) { return }
+    if ([Peak.MacroEngine]::IsPlaying -or [Peak.MacroEngine]::IsRecording -or $script:MacroCountdown -gt 0) { return }
+    $script:RecordDraft = $script:Draft
+    $sel = Get-SelectedStepIndex
+    $script:RecordInsertAt = if ($sel -ge 0) { $sel + 1 } else { @($script:Draft.Events).Count }
+    $script:RecordDelays = [bool]$ui.ChkRecDelays.IsChecked
+    $script:RecordOptions = @([bool]$ui.ChkRecMoves.IsChecked, [bool]$ui.ChkRecClicks.IsChecked, [bool]($ui.ChkRecClicks.IsChecked -and $ui.ChkRecClickPos.IsChecked))
+    Start-MacroCountdown 'Recording starts' { [Peak.MacroEngine]::StartRecording($script:RecordOptions[0], $script:RecordOptions[1], $script:RecordOptions[2]) }
+})
+$ui.BtnMacroStopRec.Add_Click({
+    if ($script:MacroCountdown -gt 0) { $MacroTimer.Stop(); $script:MacroCountdown = 0; return }
+    if ($script:MacroEngineReady) { [Peak.MacroEngine]::EndRecording($true) }
+})
+
+$ui.BtnMacroInsert.Add_Click({
+    $InsertMenu.PlacementTarget = $ui.BtnMacroInsert
+    $InsertMenu.Placement = 'Right'
+    $InsertMenu.IsOpen = $true
+})
+$ui.BtnMacroDeleteStep.Add_Click({
+    $i = Get-SelectedStepIndex
+    if ($i -lt 0) { return }
+    $list = [System.Collections.ArrayList]@($script:Draft.Events)
+    $list.RemoveAt($i)
+    $script:Draft.Events = $list.ToArray()
+    Set-DraftChanged ([math]::Min($i, $list.Count - 1))
+})
+foreach ($dir in @(@('BtnMacroUp', -1), @('BtnMacroDown', 1))) {
+    $ui[$dir[0]].Tag = $dir[1]
+    $ui[$dir[0]].Add_Click({
+        param($s, $e)
+        $i = Get-SelectedStepIndex
+        $j = $i + $s.Tag
+        if ($i -lt 0 -or $j -lt 0 -or $j -ge @($script:Draft.Events).Count) { return }
+        $steps = @($script:Draft.Events)
+        $steps[$i], $steps[$j] = $steps[$j], $steps[$i]
+        $script:Draft.Events = $steps
+        Set-DraftChanged $j
+    })
+}
+$ui.LstMacroSteps.Add_SelectionChanged({ if (-not $script:LoadingMacro) { Sync-DelayBox } })
+$ui.TxtDelay.Add_TextChanged({ if (-not $script:LoadingMacro) { Set-DelayFromBox } })
+$ui.BtnDelayUp.Add_Click({ Step-DelayBox 0.01 })
+$ui.BtnDelayDown.Add_Click({ Step-DelayBox -0.01 })
+
+$ui.BtnMacroBind.Add_Click({
+    if ($script:Draft) { Start-KeyCapture 'Bind' 'Press the key to bind this macro to. Backspace removes the binding.' ; $ui.TxtMacroBound.Text = '...' }
+})
+
+function Set-DraftRepeat {
+    if ($script:LoadingMacro -or -not $script:Draft) { return }
+    $count = 0
+    [void][int]::TryParse($ui.TxtRepeatCount.Text, [ref]$count)
+    $count = [math]::Min([math]::Max(2, $count), 9999)
+    $value = if ($ui.RbMacroOnce.IsChecked) { 1 } elseif ($ui.RbMacroLoop.IsChecked) { 0 } else { $count }
+    $ui.TxtRepeatCount.IsEnabled = [bool]$ui.RbMacroRepeat.IsChecked
+    if ($script:Draft.Repeat -ne $value) { $script:Draft.Repeat = $value; Set-DirtyKeepCaret }
+}
+foreach ($rb in $ui.RbMacroOnce, $ui.RbMacroRepeat, $ui.RbMacroLoop) { $rb.Add_Checked({ Set-DraftRepeat }) }
+$ui.TxtRepeatCount.Add_LostFocus({ $script:LoadingMacro = $true; $c = 0; [void][int]::TryParse($ui.TxtRepeatCount.Text, [ref]$c); $ui.TxtRepeatCount.Text = "$([math]::Min([math]::Max(2, $c), 9999))"; $script:LoadingMacro = $false; Set-DraftRepeat })
+$ui.TxtRepeatCount.Add_TextChanged({ Set-DraftRepeat })
+foreach ($dir in @(@('BtnRepeatUp', 1), @('BtnRepeatDown', -1))) {
+    $ui[$dir[0]].Tag = $dir[1]
+    $ui[$dir[0]].Add_Click({
+        param($s, $e)
+        $c = 0; [void][int]::TryParse($ui.TxtRepeatCount.Text, [ref]$c)
+        $ui.RbMacroRepeat.IsChecked = $true
+        $ui.TxtRepeatCount.Text = "$([math]::Min([math]::Max(2, $c + $s.Tag), 9999))"
+    })
+}
+$ui.CmbMacroSpeed.Add_SelectionChanged({
+    if ($script:LoadingMacro -or -not $script:Draft -or -not $ui.CmbMacroSpeed.SelectedItem) { return }
+    $script:Draft.Speed = $MacroSpeeds[[string]$ui.CmbMacroSpeed.SelectedItem]
+    Set-DirtyKeepCaret
+})
+
+$ui.BtnMacroPlay.Add_Click({
+    $d = $script:Draft
+    if (-not $d -or -not @($d.Events).Count -or -not (Initialize-MacroEngine)) { return }
+    if ([Peak.MacroEngine]::IsPlaying -or [Peak.MacroEngine]::IsRecording -or $script:MacroCountdown -gt 0) { return }
+    $script:PendingPlay = ConvertTo-EngineMacro $d   # plays the current edits, saved or not
+    Start-MacroCountdown "Playing '$($d.Name)'" { [Peak.MacroEngine]::Play($script:PendingPlay) }
+})
+$ui.BtnMacroStopPlay.Add_Click({
+    if ($script:MacroCountdown -gt 0) { $MacroTimer.Stop(); $script:MacroCountdown = 0 }
+    if ($script:MacroEngineReady) { [Peak.MacroEngine]::StopPlayback() }
+})
+
+# ---------- import / export ----------
 function Export-Macros([object[]]$List, [string]$FileName) {
     $dlg = New-Object Microsoft.Win32.SaveFileDialog
     $dlg.Filter = 'Peak macros (*.json)|*.json'
     $dlg.FileName = ($FileName -replace '[\\/:*?"<>|]', '_') + '.json'
     if (-not $dlg.ShowDialog()) { return }
-    ConvertTo-Json -InputObject @{ PeakMacros = 1; Macros = @($List) } -Depth 6 | Set-Content -Path $dlg.FileName -Encoding UTF8
+    ConvertTo-Json -InputObject @{ PeakMacros = 2; Macros = @($List) } -Depth 6 | Set-Content -Path $dlg.FileName -Encoding UTF8
     Write-Log "Exported $($List.Count) macro(s) to $($dlg.FileName)"
 }
 $ui.BtnMacroExport.Add_Click({
-    $m = Get-SelectedMacro
-    if (-not $m) { [System.Windows.MessageBox]::Show('Select a macro to export, or use Export All.', $AppName) | Out-Null; return }
-    Export-Macros @($m) $m.Name
+    if ($script:DraftIndex -lt 0) { [System.Windows.MessageBox]::Show('Select a macro to export, or use Export All.', $AppName) | Out-Null; return }
+    Confirm-DraftSaved
+    Export-Macros @($Macros[$script:DraftIndex]) $Macros[$script:DraftIndex].Name
 })
 $ui.BtnMacroExportAll.Add_Click({
     if (-not $Macros.Count) { [System.Windows.MessageBox]::Show('There are no macros to export yet.', $AppName) | Out-Null; return }
+    Confirm-DraftSaved
     Export-Macros @($Macros) 'peak-macros'
 })
 $ui.BtnMacroImport.Add_Click({
+    Confirm-DraftSaved
     $dlg = New-Object Microsoft.Win32.OpenFileDialog
     $dlg.Filter = 'Peak macros (*.json)|*.json|All files (*.*)|*.*'
     $dlg.Multiselect = $true
@@ -2771,15 +3092,17 @@ $ui.BtnMacroImport.Add_Click({
             foreach ($m in Read-MacroFile $file) {
                 if (-not @($m.Events).Count) { continue }
                 $m.Name = Get-UniqueMacroName $m.Name
-                # Never let an imported macro silently take over a hotkey that is already in use.
-                if ($m.Hotkey -ne 'None' -and @($Macros | Where-Object { $_.Hotkey -eq $m.Hotkey })) { $m.Hotkey = 'None' }
+                # Never let an imported macro silently take over a key that is already bound.
+                if ($m.HotkeyVk -and @($Macros | Where-Object { $_.HotkeyVk -eq $m.HotkeyVk })) { $m.HotkeyVk = 0 }
                 [void]$Macros.Add($m)
                 $added += $m
             }
         } catch { Write-Log "Could not import ${file}: $($_.Exception.Message)" 'ERROR' }
     }
     if (-not $added) { Write-Log 'No macros were found in the selected file(s).' 'WARN'; return }
-    Save-Macros; Update-MacroList -Select $added[-1]; Update-MacroBindings
+    Save-Macros; Update-MacroBindings
+    Update-MacroList ($Macros.Count - 1)
+    Open-Draft
     Write-Log "Imported $($added.Count) macro(s): $(($added | ForEach-Object Name) -join ', ')"
 })
 #endregion
@@ -2811,24 +3134,54 @@ if ($SelfTest) {
     Write-Host ("  Background job: {0} ({1} info cards, {2} hardware cards)" -f $(if ($ok) { 'OK' } else { 'FAILED' }), $ui.InfoPanel.Children.Count, $ui.HwPanel.Children.Count)
     if (-not $ok) { exit 1 }
 
-    # Macros: compile the engine, round-trip JSON (with a bogus step that must be dropped), start/stop hooks.
-    # No input is sent.
+    # Macros: compile the engine; import a v1.2.0-style file (waits stored on each step, a bogus step that must be
+    # dropped); check it becomes separate Delay steps; round-trip it; start/stop hooks. No input is sent.
     if (-not (Initialize-MacroEngine)) { Write-Host '  Macro engine: FAILED to compile'; exit 1 }
     $sample = '{"PeakMacros":1,"Macros":[{"Name":"Test","Hotkey":"F6","Repeat":3,"Speed":2,"Events":[' +
-        '{"T":0,"Type":"KeyDown","Key":87},{"T":120,"Type":"KeyUp","Key":87},{"T":50,"Type":"MouseDown","Button":"Left"},' +
-        '{"T":40,"Type":"MouseUp","Button":"Left"},{"T":5,"Type":"RunCommand","Key":1}]}]}'
+        '{"T":0,"Type":"KeyDown","Key":70},{"T":10,"Type":"KeyUp","Key":70},{"T":10,"Type":"MouseDown","Button":"Left"},' +
+        '{"T":10,"Type":"MouseUp","Button":"Left"},{"T":5,"Type":"RunCommand","Key":1}]}]}'
     $tmp = Join-Path $env:TEMP 'peak-macro-selftest.json'
     Set-Content -Path $tmp -Value $sample -Encoding UTF8
     $m = @(Read-MacroFile $tmp)[0]
     $em = ConvertTo-EngineMacro $m
-    Set-Content -Path $tmp -Value (ConvertTo-Json -InputObject @{ PeakMacros = 1; Macros = @($m) } -Depth 6) -Encoding UTF8
+    Set-Content -Path $tmp -Value (ConvertTo-Json -InputObject @{ PeakMacros = 2; Macros = @($m) } -Depth 6) -Encoding UTF8
     $again = @(Read-MacroFile $tmp)[0]
     Remove-Item $tmp -ErrorAction SilentlyContinue
+    $listing = @($again.Events | ForEach-Object { (Format-MacroStep $_) -replace '\s+', ' ' }) -join ' | '
+    $expected = 'f Hold | 0.01 Delay | f Release | 0.01 Delay | {LMouse} Hold | 0.01 Delay | {LMouse} Release'
     [Peak.MacroEngine]::Enable(); $on = [Peak.MacroEngine]::HooksActive
     [Peak.MacroEngine]::Disable(); $off = -not [Peak.MacroEngine]::HooksActive
-    $macroOk = $m.Events.Count -eq 4 -and $em.Events.Count -eq 4 -and $again.Events.Count -eq 4 -and $again.Hotkey -eq 'F6' -and $again.Speed -eq 2 -and $on -and $off
-    Write-Host ("  Macros: {0} (steps kept {1}/5, round-trip {2}, hooks on={3} off={4})" -f $(if ($macroOk) { 'OK' } else { 'FAILED' }), $m.Events.Count, $again.Events.Count, $on, $off)
+    $macroOk = $em.Events.Count -eq 7 -and $listing -eq $expected -and $again.HotkeyVk -eq 0x75 -and $again.Speed -eq 2 -and $again.Repeat -eq 3 -and $on -and $off
+    Write-Host ("  Macros: {0} (hooks on={1} off={2})" -f $(if ($macroOk) { 'OK' } else { 'FAILED' }), $on, $off)
+    Write-Host "    steps: $listing"
     if (-not $macroOk) { exit 1 }
+
+    # Drive the macro editor through its real buttons, saving to a temp file (the user's macros are untouched).
+    $MacroFile = Join-Path $env:TEMP 'peak-macro-editor-test.json'
+    $Macros.Clear(); Update-MacroList; Open-Draft
+    $click = { param($b) $b.RaiseEvent((New-Object System.Windows.RoutedEventArgs([System.Windows.Controls.Primitives.ButtonBase]::ClickEvent))) }
+    & $click $ui.BtnMacroNew
+    $ui.TxtMacroName.Text = 'Editor test'
+    Add-MacroSteps @((New-Step 'KeyDown' -Key 0x46), (New-Step 'KeyUp' -Key 0x46))     # what Insert > Key press adds for F
+    $ui.LstMacroSteps.SelectedIndex = 0
+    $ui.TxtDelay.Text = '0.25'; Invoke-InsertItem @{ Kind = 'Delay' }                    # delay after "f Hold"
+    Invoke-InsertItem @{ Kind = 'Click'; Button = 'Right' }                              # appended after the delay
+    $ui.LstMacroSteps.SelectedIndex = 1; $ui.TxtDelay.Text = '0.5'                       # edit the selected delay
+    $ui.LstMacroSteps.SelectedIndex = 4; & $click $ui.BtnMacroUp                         # "f Release" moves above "{RMouse} Release"
+    $ui.LstMacroSteps.SelectedIndex = 3; & $click $ui.BtnMacroDeleteStep                 # delete "f Release"
+    $ui.RbMacroRepeat.IsChecked = $true; $ui.TxtRepeatCount.Text = '5'
+    $script:KeyCapture = 'Bind'; $script:Draft.HotkeyVk = 0x75; $script:KeyCapture = $null   # Bind to Key result (F6)
+    $dirtyBeforeSave = $script:DraftDirty
+    & $click $ui.BtnMacroSave
+    $saved = @(Read-MacroFile $MacroFile)[0]
+    $savedSteps = @($saved.Events | ForEach-Object { (Format-MacroStep $_) -replace '\s+', ' ' }) -join ' | '
+    $script:Draft.Name = 'should be discarded'; Set-DraftDirty $true; & $click $ui.BtnMacroCancel
+    Remove-Item $MacroFile -ErrorAction SilentlyContinue
+    $editorOk = $dirtyBeforeSave -and -not $script:DraftDirty -and $saved.Name -eq 'Editor test' -and $saved.Repeat -eq 5 -and $saved.HotkeyVk -eq 0x75 -and
+        $savedSteps -eq 'f Hold | 0.5 Delay | {RMouse} Hold | {RMouse} Release' -and $script:Draft.Name -eq 'Editor test' -and $ui.LstMacros.Items[0] -like 'Editor test*F6*'
+    Write-Host ("  Macro editor: {0}" -f $(if ($editorOk) { 'OK' } else { 'FAILED' }))
+    Write-Host "    saved: $($saved.Name) / repeat $($saved.Repeat) / key $(Get-KeyName $saved.HotkeyVk) / $savedSteps"
+    if (-not $editorOk) { exit 1 }
     exit 0
 }
 $timer.Start()
