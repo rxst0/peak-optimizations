@@ -15,6 +15,7 @@ Double-click **`Launch Peak Optimizations.bat`** and accept the UAC prompt.
 | **Home** | System overview (OS, CPU, GPU, RAM, disk, uptime, power plan) and quick actions |
 | **Install** | ~70 curated apps via `winget`: install/upgrade, uninstall, upgrade all, detect installed, search |
 | **Tweaks** | 13 essential + 16 advanced tweaks, Standard / Minimal / Gaming presets, **Undo Selected**, 16 instant preference toggles |
+| **Games** | Competitive settings for **Fortnite, Rust and Rainbow Six Siege**: edits each game's own settings file (low effects, no V-Sync or motion blur, raw input…), sets Windows to use the high-performance GPU, and backs everything up so **Restore Original** puts it back. Resolution, sensitivity, keybinds and FPS cap are never changed |
 | **Config** | Windows features (.NET 3.5, Hyper-V, WSL, Sandbox…), fixes (network reset, Windows Update reset, DISM+SFC, component cleanup, winget reset), DNS switcher, legacy control panels |
 | **Updates** | Security-only (recommended), Default, or Disable all |
 

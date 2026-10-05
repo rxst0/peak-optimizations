@@ -13,7 +13,7 @@ param(
 
 #region Bootstrap ---------------------------------------------------------------
 $AppName = 'Peak Optimizations'
-$AppVersion = '1.0.0'
+$AppVersion = '1.1.0'
 
 $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(
     [Security.Principal.WindowsBuiltInRole]::Administrator)
@@ -609,6 +609,181 @@ $DnsProviders = [ordered]@{
 }
 #endregion
 
+#region Games: competitive settings by editing each game's own settings file --------------
+function Get-SteamGameDirs([string]$Folder) {
+    $steam = Get-RegValue 'HKCU:\Software\Valve\Steam' 'SteamPath'
+    if (-not $steam) { $steam = Get-RegValue 'HKLM:\SOFTWARE\WOW6432Node\Valve\Steam' 'InstallPath' }
+    if (-not $steam) { return }
+    $libs = @($steam -replace '/', '\')
+    $vdf = Join-Path $steam 'steamapps\libraryfolders.vdf'
+    if (Test-Path $vdf) {
+        foreach ($m in [regex]::Matches((Get-Content $vdf -Raw), '"path"\s+"([^"]+)"')) { $libs += $m.Groups[1].Value -replace '\\\\', '\' }
+    }
+    $libs | Select-Object -Unique | ForEach-Object { Join-Path $_ "steamapps\common\$Folder" } | Where-Object { Test-Path -LiteralPath $_ }
+}
+
+function Get-EpicGameDirs([string]$DisplayName) {
+    Get-ChildItem "$env:ProgramData\Epic\EpicGamesLauncher\Data\Manifests\*.item" -ErrorAction SilentlyContinue |
+        ForEach-Object { try { Get-Content $_.FullName -Raw | ConvertFrom-Json } catch { } } |
+        Where-Object { $_.DisplayName -eq $DisplayName -and $_.InstallLocation } | ForEach-Object InstallLocation
+}
+
+# Only keys that already exist in the file are changed, so nothing unknown is ever added.
+# Resolution, sensitivity, keybinds and FPS caps are never touched.
+$Games = @(
+    @{ Id = 'Fortnite'; Name = 'Fortnite'; Format = 'Ini'
+        Process = @('FortniteClient-Win64-Shipping', 'FortniteLauncher')
+        Desc = 'Low shadows, shading, effects, post-processing, foliage, reflections, global illumination and anti-aliasing; V-Sync, motion blur, grass and Nanite off; mouse acceleration off. View distance and textures are left as you set them.'
+        FindConfig = { $p = "$env:LOCALAPPDATA\FortniteGame\Saved\Config\WindowsClient\GameUserSettings.ini"; if (Test-Path $p) { $p } }
+        FindExe = { Get-EpicGameDirs 'Fortnite' | ForEach-Object { Join-Path $_ 'FortniteGame\Binaries\Win64\FortniteClient-Win64-Shipping.exe' } | Where-Object { Test-Path -LiteralPath $_ } }
+        Settings = @{
+            'ScalabilityGroups' = @{
+                'sg.ShadowQuality' = '0'; 'sg.GlobalIlluminationQuality' = '0'; 'sg.ReflectionQuality' = '0'; 'sg.PostProcessQuality' = '0'
+                'sg.EffectsQuality' = '0'; 'sg.FoliageQuality' = '0'; 'sg.ShadingQuality' = '0'; 'sg.AntiAliasingQuality' = '0'
+            }
+            '/Script/FortniteGame.FortGameUserSettings' = @{
+                'bUseVSync' = 'False'; 'bMotionBlur' = 'False'; 'bShowGrass' = 'False'; 'bUseNanite' = 'False'; 'bDisableMouseAcceleration' = 'True'
+            }
+        }
+    }
+    @{ Id = 'Rust'; Name = 'Rust'; Format = 'Cfg'
+        Process = @('RustClient')
+        Desc = 'Turns off V-Sync, motion blur, ambient occlusion, bloom, lens dirt, vignette, sun shafts, depth of field, volumetric clouds, grass displacement, contact shadows and gibs; lowest shadow-light and water quality; 1 queued frame for lower input lag.'
+        FindConfig = { Get-SteamGameDirs 'Rust' | ForEach-Object { Join-Path $_ 'cfg\client.cfg' } | Where-Object { Test-Path -LiteralPath $_ } }
+        FindExe = { Get-SteamGameDirs 'Rust' | ForEach-Object { Join-Path $_ 'RustClient.exe' } | Where-Object { Test-Path -LiteralPath $_ } }
+        Settings = @{
+            'graphics.vsync' = '0'; 'effects.motionblur' = 'False'; 'effects.ao' = 'False'; 'effects.bloom' = 'False'; 'effects.lensdirt' = 'False'
+            'effects.vignet' = 'False'; 'effects.shafts' = 'False'; 'graphics.dof' = 'False'; 'graphics.volumetric_clouds' = '0'
+            'grass.displacement' = 'False'; 'graphics.contactshadows' = 'False'; 'effects.maxgibs' = '0'; 'graphics.shadowlights' = '0'
+            'water.quality' = '0'; 'water.reflections' = '0'; 'graphics.maxqueuedframes' = '1'
+        }
+    }
+    @{ Id = 'Siege'; Name = 'Rainbow Six Siege'; Format = 'Ini'
+        Process = @('RainbowSix', 'RainbowSix_Vulkan', 'RainbowSix_BE')
+        Desc = 'V-Sync, letterbox and lens effects off; lowest reflections; raw mouse input on. Shadows are left alone (they show enemy positions). Applied to every Ubisoft profile on this PC.'
+        FindConfig = {
+            $docs = [Environment]::GetFolderPath('MyDocuments')
+            Get-ChildItem (Join-Path $docs 'My Games') -Directory -Filter 'Rainbow Six*' -ErrorAction SilentlyContinue |
+                ForEach-Object { Get-ChildItem $_.FullName -Recurse -Depth 1 -Filter 'GameSettings.ini' -ErrorAction SilentlyContinue } | ForEach-Object FullName
+        }
+        FindExe = {
+            $dirs = @(Get-SteamGameDirs "Tom Clancy's Rainbow Six Siege")
+            $ubi = Get-RegValue 'HKLM:\SOFTWARE\WOW6432Node\Ubisoft\Launcher\Installs\635' 'InstallDir'
+            if ($ubi) { $dirs += $ubi }
+            foreach ($d in $dirs) { 'RainbowSix.exe', 'RainbowSix_Vulkan.exe' | ForEach-Object { Join-Path $d $_ } | Where-Object { Test-Path -LiteralPath $_ } }
+        }
+        # Siege's section names have changed between seasons, so these keys match in any section.
+        Settings = @{
+            '*' = @{
+                'VSync' = '0'; 'UseLetterbox' = '0'; 'LensEffects' = '0'; 'Reflection' = '0'; 'RawInputMouseKeyboard' = '1'
+                # Names used by older seasons.
+                'AmbientOcclusion' = '0'; 'ZoomInDepthOfField' = '0'; 'ReflectionQuality' = '0'
+            }
+        }
+    }
+)
+
+$GpuPrefKey = 'HKCU:\Software\Microsoft\DirectX\UserGpuPreferences'
+
+function Read-TextFile([string]$Path) {
+    $reader = New-Object System.IO.StreamReader($Path, $true)
+    try { $text = $reader.ReadToEnd(); $enc = $reader.CurrentEncoding } finally { $reader.Close() }
+    # StreamReader reports UTF-8 when there is no BOM; write such files back without one.
+    $b = [System.IO.File]::ReadAllBytes($Path)
+    $hasBom = $b.Length -ge 2 -and (($b[0] -eq 0xEF -and $b[1] -eq 0xBB) -or ($b[0] -eq 0xFF -and $b[1] -eq 0xFE) -or ($b[0] -eq 0xFE -and $b[1] -eq 0xFF))
+    if (-not $hasBom) { $enc = New-Object System.Text.UTF8Encoding($false) }
+    @{ Text = $text; Encoding = $enc }
+}
+
+function Update-ConfigFile([string]$Path, [string]$Format, [hashtable]$Settings) {
+    $file = Read-TextFile $Path
+    $nl = if ($file.Text -match "`r`n") { "`r`n" } else { "`n" }
+    $lines = $file.Text -split "`r?`n"
+    $section = ''
+    $changed = 0
+    for ($i = 0; $i -lt $lines.Count; $i++) {
+        if ($Format -eq 'Ini') {
+            if ($lines[$i] -match '^\s*\[(.+)\]\s*$') { $section = $Matches[1]; continue }
+            if ($lines[$i] -notmatch '^\s*([^=;#\s][^=]*?)\s*=(.*)$') { continue }
+            $key = $Matches[1]; $old = $Matches[2]; $want = $null
+            foreach ($s in $section, '*') {
+                if ($Settings.ContainsKey($s) -and $Settings[$s].ContainsKey($key)) { $want = $Settings[$s][$key]; break }
+            }
+            if ($null -eq $want -or $old -ceq $want) { continue }
+            $lines[$i] = "$key=$want"
+        } else {
+            if ($lines[$i] -notmatch '^\s*(\S+)\s+"(.*)"\s*$') { continue }
+            $key = $Matches[1]; $old = $Matches[2]
+            if (-not $Settings.ContainsKey($key) -or $old -ceq $Settings[$key]) { continue }
+            $lines[$i] = '{0} "{1}"' -f $key, $Settings[$key]
+        }
+        $changed++
+    }
+    if ($changed) { [System.IO.File]::WriteAllText($Path, ($lines -join $nl), $file.Encoding) }
+    $changed
+}
+
+function Test-GameRunning($Game) {
+    if (Get-Process -Name $Game.Process -ErrorAction SilentlyContinue) {
+        [System.Windows.MessageBox]::Show("Close $($Game.Name) first - games overwrite their settings file when they exit.", $AppName) | Out-Null
+        return $true
+    }
+    $false
+}
+
+function Invoke-GameOptimize($Game) {
+    if (Test-GameRunning $Game) { return }
+    $files = @(& $Game.FindConfig)
+    if (-not $files) {
+        Write-Log "$($Game.Name): settings file not found. Launch the game once, change any setting, close it, then try again." 'WARN'
+        return
+    }
+    Write-Log "=== Optimize $($Game.Name) ==="
+    $dir = Join-Path $DataDir ("GameBackups\{0}\{1}" -f $Game.Id, (Get-Date -Format 'yyyyMMdd-HHmmss'))
+    New-Item -ItemType Directory -Path $dir -Force | Out-Null
+    $manifest = @{ Files = @(); Gpu = @() }
+    $n = 0
+    foreach ($f in $files) {
+        $n++
+        $bak = Join-Path $dir ('{0}-{1}' -f $n, (Split-Path $f -Leaf))
+        Copy-Item -LiteralPath $f -Destination $bak -Force
+        $manifest.Files += @{ Original = $f; Backup = $bak }
+        try {
+            $count = Update-ConfigFile -Path $f -Format $Game.Format -Settings $Game.Settings
+            Write-Log "  ${f}: $count setting(s) changed"
+        } catch { Write-Log "  ${f}: $($_.Exception.Message)" 'ERROR' }
+    }
+    foreach ($exe in @(& $Game.FindExe)) {
+        $manifest.Gpu += @{ Exe = $exe; Old = (Get-RegValue $GpuPrefKey $exe) }
+        Set-RegValue $GpuPrefKey $exe 'GpuPreference=2;' 'String'
+        Write-Log "  Windows graphics preference set to High performance for $(Split-Path $exe -Leaf)"
+    }
+    $manifest | ConvertTo-Json -Depth 4 | Set-Content -Path (Join-Path $dir 'manifest.json') -Encoding UTF8
+    Write-Log "$($Game.Name) optimized. Backup: $dir"
+}
+
+function Restore-GameOriginal($Game) {
+    if (Test-GameRunning $Game) { return }
+    $root = Join-Path $DataDir "GameBackups\$($Game.Id)"
+    # The oldest backup holds the settings from before Peak Optimizations first touched the game.
+    $first = Get-ChildItem $root -Directory -ErrorAction SilentlyContinue | Sort-Object Name | Select-Object -First 1
+    if (-not $first) { Write-Log "$($Game.Name): no backup to restore."; return }
+    $m = Get-Content (Join-Path $first.FullName 'manifest.json') -Raw | ConvertFrom-Json
+    foreach ($f in @($m.Files)) {
+        if (-not $f) { continue }
+        Copy-Item -LiteralPath $f.Backup -Destination $f.Original -Force
+        Write-Log "  Restored $($f.Original)"
+    }
+    foreach ($g in @($m.Gpu)) {
+        if (-not $g) { continue }
+        $old = if ($null -eq $g.Old) { '<Remove>' } else { $g.Old }
+        Set-RegValue $GpuPrefKey $g.Exe $old 'String'
+    }
+    Remove-Item $root -Recurse -Force
+    Write-Log "$($Game.Name): original settings restored."
+}
+#endregion
+
 #region UI definition ------------------------------------------------------------------
 $xamlText = @'
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
@@ -830,6 +1005,22 @@ $xamlText = @'
             </Border>
           </Grid>
         </DockPanel>
+      </TabItem>
+
+      <TabItem Header="Games">
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+          <StackPanel>
+            <DockPanel Margin="0,0,0,8">
+              <Button x:Name="BtnRescanGames" DockPanel.Dock="Right" Content="Re-scan for Games" VerticalAlignment="Top"/>
+              <StackPanel>
+                <TextBlock Style="{StaticResource H}" Text="Competitive Game Settings"/>
+                <TextBlock Style="{StaticResource Muted}" TextWrapping="Wrap" MaxWidth="820" HorizontalAlignment="Left"
+                  Text="Edits each game's own settings file for higher FPS and better visibility, and sets Windows to run the game on your high-performance GPU. Close the game first. Your resolution, sensitivity, keybinds and FPS cap are not changed. The original file is backed up, and Restore Original puts it back. For Windows-side gaming tweaks, use the Gaming preset on the Tweaks tab."/>
+              </StackPanel>
+            </DockPanel>
+            <WrapPanel x:Name="GamePanel"/>
+          </StackPanel>
+        </ScrollViewer>
       </TabItem>
 
       <TabItem Header="Config">
@@ -1085,6 +1276,60 @@ foreach ($p in $LegacyPanels) {
 # DNS
 foreach ($k in $DnsProviders.Keys) { [void]$ui.CmbDns.Items.Add($k) }
 $ui.CmbDns.SelectedIndex = 0
+
+# Games
+$Brush = New-Object System.Windows.Media.BrushConverter
+function Update-GameStatus($Game) {
+    $files = @(& $Game.FindConfig)
+    $exes = @(& $Game.FindExe)
+    $hasBackup = [bool](Get-ChildItem (Join-Path $DataDir "GameBackups\$($Game.Id)") -Directory -ErrorAction SilentlyContinue)
+    if ($files) {
+        $Game.Status.Text = 'Settings file found' + $(if ($files.Count -gt 1) { " ($($files.Count) profiles)" } else { '' }) +
+            $(if ($exes) { ' - game install found' } else { '' }) + $(if ($hasBackup) { ' - optimized (backup saved)' } else { '' })
+        $Game.Status.Foreground = $Brush.ConvertFromString('#5FD38D')
+    } else {
+        $Game.Status.Text = 'Not found - launch the game once, then Re-scan'
+        $Game.Status.Foreground = $Brush.ConvertFromString('#9A9AB0')
+    }
+    $Game.ApplyButton.IsEnabled = [bool]$files
+    $Game.RestoreButton.IsEnabled = $hasBackup
+}
+
+foreach ($g in $Games) {
+    $card = New-Card $g.Name 360
+    $status = New-Object System.Windows.Controls.TextBlock
+    $status.FontSize = 12
+    $status.Margin = [System.Windows.Thickness]::new(0, 0, 0, 8)
+    $desc = New-Object System.Windows.Controls.TextBlock
+    $desc.Text = $g.Desc
+    $desc.TextWrapping = 'Wrap'
+    $desc.Style = $window.FindResource('Muted')
+    $buttons = New-Object System.Windows.Controls.WrapPanel
+    $buttons.Margin = [System.Windows.Thickness]::new(-4, 10, 0, 0)
+    $apply = New-Object System.Windows.Controls.Button
+    $apply.Content = 'Optimize'; $apply.Style = $window.FindResource('AccentButton')
+    $restore = New-Object System.Windows.Controls.Button
+    $restore.Content = 'Restore Original'
+    $open = New-Object System.Windows.Controls.Button
+    $open.Content = 'Open Folder'
+    foreach ($b in $apply, $restore, $open) { $b.Tag = $g; [void]$buttons.Children.Add($b) }
+    $apply.Add_Click({ param($s, $e); Invoke-GameOptimize $s.Tag; Update-GameStatus $s.Tag })
+    $restore.Add_Click({
+        param($s, $e)
+        $ok = [System.Windows.MessageBox]::Show("Restore $($s.Tag.Name)'s settings to how they were before Peak Optimizations first changed them?", $AppName, 'YesNo')
+        if ($ok -eq 'Yes') { Restore-GameOriginal $s.Tag; Update-GameStatus $s.Tag }
+    })
+    $open.Add_Click({
+        param($s, $e)
+        $f = @(& $s.Tag.FindConfig) | Select-Object -First 1
+        if ($f) { Start-Process explorer.exe "/select,`"$f`"" } else { Write-Log "$($s.Tag.Name): settings file not found." 'WARN' }
+    })
+    foreach ($c in $status, $desc, $buttons) { [void]$card.Child.Children.Add($c) }
+    $g.Status = $status; $g.ApplyButton = $apply; $g.RestoreButton = $restore
+    [void]$ui.GamePanel.Children.Add($card)
+    try { Update-GameStatus $g } catch { $status.Text = "Scan failed: $($_.Exception.Message)" }
+}
+$ui.BtnRescanGames.Add_Click({ foreach ($g in $Games) { Update-GameStatus $g }; Write-Log 'Re-scanned for games.' })
 #endregion
 
 #region Actions ---------------------------------------------------------------------------
@@ -1388,8 +1633,9 @@ $window.Add_Closing({
 #region Start ---------------------------------------------------------------------------
 Write-Log "$AppName v$AppVersion ready. Logs and undo backups: $DataDir"
 if ($SelfTest) {
-    Write-Host ("SelfTest OK: {0} named controls, {1} apps, {2} tweaks, {3} toggles, {4} features" -f `
-        $ui.Count, $AppChecks.Count, $TweakChecks.Count, $Toggles.Count, $FeatureChecks.Count)
+    Write-Host ("SelfTest OK: {0} named controls, {1} apps, {2} tweaks, {3} toggles, {4} features, {5} games" -f `
+        $ui.Count, $AppChecks.Count, $TweakChecks.Count, $Toggles.Count, $FeatureChecks.Count, $Games.Count)
+    foreach ($g in $Games) { Write-Host "  $($g.Name): $($g.Status.Text)" }
     $missing = @($ui.Keys | Where-Object { -not $ui[$_] })
     if ($missing) { Write-Host "Missing controls: $($missing -join ', ')"; exit 1 }
     exit 0
