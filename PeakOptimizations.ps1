@@ -495,6 +495,76 @@ $Tweaks = @(
         Desc = 'Only for dual-boot with Linux: stops the clock being wrong after switching OS.'
         Registry = @(Reg 'HKLM:\SYSTEM\CurrentControlSet\Control\TimeZoneInformation' 'RealTimeIsUniversal' 1 'QWord')
     }
+
+    # ---------------- Competitive ----------------
+    # These never touch Core Isolation / Memory Integrity (VBS, HVCI), Spectre/Meltdown mitigations,
+    # DEP, Defender or Secure Boot - anti-cheats such as Vanguard and FACEIT require those.
+    @{ Id = 'ForegroundBoost'; Group = 'Competitive'; Name = 'Prioritize the Game Window'
+        Desc = 'Win32PrioritySeparation = 0x26: short, variable CPU time slices with a boost for the foreground app (the game). Smoother frame pacing.'
+        Registry = @(Reg 'HKLM:\SYSTEM\CurrentControlSet\Control\PriorityControl' 'Win32PrioritySeparation' 0x26)
+    }
+    @{ Id = 'PowerThrottling'; Group = 'Competitive'; Name = 'Disable Power Throttling'
+        Desc = 'Stops Windows parking background/launcher processes on slow, low-power CPU states (can cause stutter when tabbing or with overlays). Slightly higher power use on laptops.'
+        Registry = @(Reg 'HKLM:\SYSTEM\CurrentControlSet\Control\Power\PowerThrottling' 'PowerThrottlingOff' 1)
+    }
+    @{ Id = 'TimerResolution'; Group = 'Competitive'; Name = 'Global Timer Resolution Requests'
+        Desc = 'Windows 11: lets a game''s high-precision timer request apply system-wide again, as on Windows 10. Steadier frame times in games that request it.'
+        Registry = @(Reg 'HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\kernel' 'GlobalTimerResolutionRequests' 1)
+    }
+    @{ Id = 'HAGS'; Group = 'Competitive'; Name = 'Hardware-Accelerated GPU Scheduling'
+        Desc = 'Lets the GPU manage its own memory scheduling. Lower latency on modern GPUs (needed for frame generation). Reboot required.'
+        Registry = @(Reg 'HKLM:\SYSTEM\CurrentControlSet\Control\GraphicsDrivers' 'HwSchMode' 2)
+    }
+    @{ Id = 'WindowedOpt'; Group = 'Competitive'; Name = 'Optimizations for Windowed Games'
+        Desc = 'Gives borderless/windowed games the same low-latency flip presentation as exclusive fullscreen. Keeps your other per-GPU graphics settings.'
+        Script = {
+            $k = 'HKCU:\Software\Microsoft\DirectX\UserGpuPreferences'; $n = 'DirectXUserGlobalSettings'
+            Backup-RegValue $k $n
+            $parts = @(([string](Get-RegValue $k $n)) -split ';' | Where-Object { $_ -and $_ -notmatch '^SwapEffectUpgradeEnable=' }) + 'SwapEffectUpgradeEnable=1'
+            Set-RegValue $k $n (($parts -join ';') + ';') 'String'
+        }
+        Undo = { Restore-RegValue 'HKCU:\Software\Microsoft\DirectX\UserGpuPreferences' 'DirectXUserGlobalSettings' }
+    }
+    @{ Id = 'KeyboardResponse'; Group = 'Competitive'; Name = 'Fastest Keyboard Repeat'
+        Desc = 'Shortest repeat delay and fastest repeat rate for held keys. Sign out to apply.'
+        Registry = @(
+            Reg 'HKCU:\Control Panel\Keyboard' 'KeyboardDelay' '0' 'String'
+            Reg 'HKCU:\Control Panel\Keyboard' 'KeyboardSpeed' '31' 'String'
+        )
+    }
+    @{ Id = 'NagleOff'; Group = 'Competitive'; Name = 'Disable Nagle''s Algorithm'
+        Desc = 'Sends small TCP packets immediately instead of batching them (TcpAckFrequency/TCPNoDelay on every network adapter). Helps games that use TCP; UDP games are unaffected.'
+        Script = {
+            $root = 'HKLM:\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\Interfaces'
+            foreach ($nic in Get-ChildItem $root -ErrorAction SilentlyContinue) {
+                $p = "$root\$($nic.PSChildName)"
+                if (-not ((Get-RegValue $p 'DhcpIPAddress') -or (Get-RegValue $p 'IPAddress'))) { continue }
+                foreach ($n in 'TcpAckFrequency', 'TCPNoDelay') { Backup-RegValue $p $n; Set-RegValue $p $n 1 }
+            }
+        }
+        Undo = {
+            $root = 'HKLM:\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\Interfaces'
+            foreach ($nic in Get-ChildItem $root -ErrorAction SilentlyContinue) {
+                $p = "$root\$($nic.PSChildName)"
+                foreach ($n in 'TcpAckFrequency', 'TCPNoDelay') { if ($sync.Backup.ContainsKey("reg|$p|$n")) { Restore-RegValue $p $n } }
+            }
+        }
+    }
+    @{ Id = 'UsbSuspend'; Group = 'Competitive'; Name = 'Disable USB Selective Suspend'
+        Desc = 'Stops Windows putting USB devices (mouse, keyboard, headset) to sleep, which can cause a wake-up delay or dropped inputs.'
+        Script = {
+            foreach ($mode in '/setacvalueindex', '/setdcvalueindex') { powercfg.exe $mode SCHEME_CURRENT 2a737441-1930-4402-8d77-b2bebba308a3 48e6b7a6-50f5-4782-a5d4-53bb8f07e226 0 }
+            powercfg.exe /setactive SCHEME_CURRENT
+        }
+        Undo = {
+            foreach ($mode in '/setacvalueindex', '/setdcvalueindex') { powercfg.exe $mode SCHEME_CURRENT 2a737441-1930-4402-8d77-b2bebba308a3 48e6b7a6-50f5-4782-a5d4-53bb8f07e226 1 }
+            powercfg.exe /setactive SCHEME_CURRENT
+        }
+    }
+    @{ Id = 'NoP2PUpload'; Group = 'Competitive'; Name = 'Stop Update Sharing to Other PCs'
+        Desc = 'Delivery Optimization stops uploading Windows updates to other PCs over the internet, so it can''t eat your upload bandwidth mid-match.'
+        Registry = @(Reg 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\DeliveryOptimization' 'DODownloadMode' 0)
+    }
 )
 $TweakMap = @{}
 foreach ($t in $Tweaks) { $TweakMap[$t.Id] = $t }
@@ -502,7 +572,8 @@ foreach ($t in $Tweaks) { $TweakMap[$t.Id] = $t }
 $Presets = @{
     Standard = @('RestorePoint', 'TempFiles', 'Telemetry', 'ActivityHistory', 'Location', 'GameDVR', 'ConsumerFeatures', 'WifiSense', 'EndTask', 'ServicesManual', 'PS7Telemetry', 'DiskCleanup')
     Minimal  = @('RestorePoint', 'Telemetry', 'ActivityHistory', 'ConsumerFeatures', 'WifiSense', 'PS7Telemetry', 'EndTask')
-    Gaming   = @('RestorePoint', 'TempFiles', 'Telemetry', 'ActivityHistory', 'Location', 'GameDVR', 'ConsumerFeatures', 'WifiSense', 'EndTask', 'ServicesManual', 'PS7Telemetry', 'BackgroundApps', 'UltimatePower', 'GamingNetwork', 'FSO', 'OemSoftware')
+    Gaming   = @('RestorePoint', 'TempFiles', 'Telemetry', 'ActivityHistory', 'Location', 'GameDVR', 'ConsumerFeatures', 'WifiSense', 'EndTask', 'ServicesManual', 'PS7Telemetry', 'BackgroundApps', 'UltimatePower', 'GamingNetwork', 'FSO', 'OemSoftware',
+        'ForegroundBoost', 'PowerThrottling', 'TimerResolution', 'HAGS', 'WindowedOpt', 'KeyboardResponse', 'NagleOff', 'UsbSuspend', 'NoP2PUpload')
 }
 #endregion
 
@@ -633,34 +704,84 @@ function Get-EpicGameDirs([string]$DisplayName) {
 $Games = @(
     @{ Id = 'Fortnite'; Name = 'Fortnite'; Format = 'Ini'
         Process = @('FortniteClient-Win64-Shipping', 'FortniteLauncher')
-        Desc = 'Low shadows, shading, effects, post-processing, foliage, reflections, global illumination and anti-aliasing; V-Sync, motion blur, grass and Nanite off; mouse acceleration off. View distance and textures are left as you set them.'
         FindConfig = { $p = "$env:LOCALAPPDATA\FortniteGame\Saved\Config\WindowsClient\GameUserSettings.ini"; if (Test-Path $p) { $p } }
         FindExe = { Get-EpicGameDirs 'Fortnite' | ForEach-Object { Join-Path $_ 'FortniteGame\Binaries\Win64\FortniteClient-Win64-Shipping.exe' } | Where-Object { Test-Path -LiteralPath $_ } }
-        Settings = @{
-            'ScalabilityGroups' = @{
-                'sg.ShadowQuality' = '0'; 'sg.GlobalIlluminationQuality' = '0'; 'sg.ReflectionQuality' = '0'; 'sg.PostProcessQuality' = '0'
-                'sg.EffectsQuality' = '0'; 'sg.FoliageQuality' = '0'; 'sg.ShadingQuality' = '0'; 'sg.AntiAliasingQuality' = '0'
+        Base = @{
+            '/Script/FortniteGame.FortGameUserSettings' = @{ 'bUseVSync' = 'False'; 'bMotionBlur' = 'False'; 'bDisableMouseAcceleration' = 'True' }
+        }
+        Presets = [ordered]@{
+            'Competitive' = @{
+                Desc = 'Clear visibility at high FPS: shadows, shading, effects, post-processing, foliage, reflections, global illumination and anti-aliasing low; grass and Nanite off. View distance and textures stay as you set them so far-away players remain visible.'
+                Settings = @{
+                    'ScalabilityGroups' = @{
+                        'sg.ShadowQuality' = '0'; 'sg.GlobalIlluminationQuality' = '0'; 'sg.ReflectionQuality' = '0'; 'sg.PostProcessQuality' = '0'
+                        'sg.EffectsQuality' = '0'; 'sg.FoliageQuality' = '0'; 'sg.ShadingQuality' = '0'; 'sg.AntiAliasingQuality' = '0'
+                    }
+                    '/Script/FortniteGame.FortGameUserSettings' = @{ 'bShowGrass' = 'False'; 'bUseNanite' = 'False' }
+                }
             }
-            '/Script/FortniteGame.FortGameUserSettings' = @{
-                'bUseVSync' = 'False'; 'bMotionBlur' = 'False'; 'bShowGrass' = 'False'; 'bUseNanite' = 'False'; 'bDisableMouseAcceleration' = 'True'
+            'Max FPS' = @{
+                Desc = 'Everything lowest, including textures, terrain, meshes and medium view distance. For weaker PCs or chasing the highest frame rate.'
+                Settings = @{
+                    'ScalabilityGroups' = @{
+                        'sg.ViewDistanceQuality' = '1'; 'sg.TextureQuality' = '0'; 'sg.LandscapeQuality' = '0'
+                        'sg.ShadowQuality' = '0'; 'sg.GlobalIlluminationQuality' = '0'; 'sg.ReflectionQuality' = '0'; 'sg.PostProcessQuality' = '0'
+                        'sg.EffectsQuality' = '0'; 'sg.FoliageQuality' = '0'; 'sg.ShadingQuality' = '0'; 'sg.AntiAliasingQuality' = '0'
+                    }
+                    'PerformanceMode' = @{ 'MeshQuality' = '0' }
+                    '/Script/FortniteGame.FortGameUserSettings' = @{ 'bShowGrass' = 'False'; 'bUseNanite' = 'False' }
+                }
+            }
+            'Balanced' = @{
+                Desc = 'Good-looking but responsive: high textures and epic view distance, medium-high effects, V-Sync and motion blur still off.'
+                Settings = @{
+                    'ScalabilityGroups' = @{
+                        'sg.ViewDistanceQuality' = '3'; 'sg.TextureQuality' = '3'; 'sg.ShadowQuality' = '2'; 'sg.GlobalIlluminationQuality' = '2'
+                        'sg.ReflectionQuality' = '2'; 'sg.PostProcessQuality' = '1'; 'sg.EffectsQuality' = '2'; 'sg.FoliageQuality' = '2'
+                        'sg.ShadingQuality' = '2'; 'sg.AntiAliasingQuality' = '2'
+                    }
+                    '/Script/FortniteGame.FortGameUserSettings' = @{ 'bShowGrass' = 'True' }
+                }
             }
         }
     }
     @{ Id = 'Rust'; Name = 'Rust'; Format = 'Cfg'
         Process = @('RustClient')
-        Desc = 'Turns off V-Sync, motion blur, ambient occlusion, bloom, lens dirt, vignette, sun shafts, depth of field, volumetric clouds, grass displacement, contact shadows and gibs; lowest shadow-light and water quality; 1 queued frame for lower input lag.'
         FindConfig = { Get-SteamGameDirs 'Rust' | ForEach-Object { Join-Path $_ 'cfg\client.cfg' } | Where-Object { Test-Path -LiteralPath $_ } }
         FindExe = { Get-SteamGameDirs 'Rust' | ForEach-Object { Join-Path $_ 'RustClient.exe' } | Where-Object { Test-Path -LiteralPath $_ } }
-        Settings = @{
-            'graphics.vsync' = '0'; 'effects.motionblur' = 'False'; 'effects.ao' = 'False'; 'effects.bloom' = 'False'; 'effects.lensdirt' = 'False'
-            'effects.vignet' = 'False'; 'effects.shafts' = 'False'; 'graphics.dof' = 'False'; 'graphics.volumetric_clouds' = '0'
-            'grass.displacement' = 'False'; 'graphics.contactshadows' = 'False'; 'effects.maxgibs' = '0'; 'graphics.shadowlights' = '0'
-            'water.quality' = '0'; 'water.reflections' = '0'; 'graphics.maxqueuedframes' = '1'
+        Base = @{
+            'graphics.vsync' = '0'; 'graphics.maxqueuedframes' = '1'; 'effects.motionblur' = 'False'; 'effects.lensdirt' = 'False'
+            'effects.vignet' = 'False'; 'graphics.dof' = 'False'
+        }
+        Presets = [ordered]@{
+            'Competitive' = @{
+                Desc = 'Clean image at high FPS: AO, bloom, sun shafts, volumetric clouds, grass displacement, contact shadows and gibs off; lowest shadow lights and water. 1 queued frame and no V-Sync for lower input lag.'
+                Settings = @{
+                    'effects.ao' = 'False'; 'effects.bloom' = 'False'; 'effects.shafts' = 'False'; 'graphics.volumetric_clouds' = '0'
+                    'grass.displacement' = 'False'; 'graphics.contactshadows' = 'False'; 'effects.maxgibs' = '0'; 'graphics.shadowlights' = '0'
+                    'water.quality' = '0'; 'water.reflections' = '0'
+                }
+            }
+            'Max FPS' = @{
+                Desc = 'Competitive plus lowest grass, trees, terrain and particles. Less grass also makes players easier to spot.'
+                Settings = @{
+                    'effects.ao' = 'False'; 'effects.bloom' = 'False'; 'effects.shafts' = 'False'; 'graphics.volumetric_clouds' = '0'
+                    'grass.displacement' = 'False'; 'graphics.contactshadows' = 'False'; 'effects.maxgibs' = '0'; 'graphics.shadowlights' = '0'
+                    'water.quality' = '0'; 'water.reflections' = '0'
+                    'grass.quality' = '0'; 'tree.quality' = '0'; 'tree.meshes' = '0'; 'terrain.quality' = '0'; 'particle.quality' = '0'
+                }
+            }
+            'Balanced' = @{
+                Desc = 'Nice visuals with low latency: AO, sun shafts, medium clouds, water and shadow lights on; motion blur, lens dirt, vignette, depth of field and V-Sync still off.'
+                Settings = @{
+                    'effects.ao' = 'True'; 'effects.bloom' = 'False'; 'effects.shafts' = 'True'; 'graphics.volumetric_clouds' = '2'
+                    'grass.displacement' = 'True'; 'graphics.shadowlights' = '1'; 'water.quality' = '1'; 'water.reflections' = '1'
+                }
+            }
         }
     }
     @{ Id = 'Siege'; Name = 'Rainbow Six Siege'; Format = 'Ini'
         Process = @('RainbowSix', 'RainbowSix_Vulkan', 'RainbowSix_BE')
-        Desc = 'V-Sync, letterbox and lens effects off; lowest reflections; raw mouse input on. Shadows are left alone (they show enemy positions). Applied to every Ubisoft profile on this PC.'
         FindConfig = {
             $docs = [Environment]::GetFolderPath('MyDocuments')
             Get-ChildItem (Join-Path $docs 'My Games') -Directory -Filter 'Rainbow Six*' -ErrorAction SilentlyContinue |
@@ -672,18 +793,51 @@ $Games = @(
             if ($ubi) { $dirs += $ubi }
             foreach ($d in $dirs) { 'RainbowSix.exe', 'RainbowSix_Vulkan.exe' | ForEach-Object { Join-Path $d $_ } | Where-Object { Test-Path -LiteralPath $_ } }
         }
-        # Siege's section names have changed between seasons, so these keys match in any section.
-        Settings = @{
+        # Siege's section names change between seasons, so keys match in any section ('*').
+        # Shadow scale in Siege X: 0 Off, 1 Low, 2 Medium, 3 High, 4 Ultra.
+        Base = @{
             '*' = @{
-                'VSync' = '0'; 'UseLetterbox' = '0'; 'LensEffects' = '0'; 'Reflection' = '0'; 'RawInputMouseKeyboard' = '1'
-                # Names used by older seasons.
-                'AmbientOcclusion' = '0'; 'ZoomInDepthOfField' = '0'; 'ReflectionQuality' = '0'
+                'OverallQualityLevelName' = 'Custom'; 'VSync' = '0'; 'UseLetterbox' = '0'; 'LensEffects' = '0'; 'DOF' = '0'
+                'RawInputMouseKeyboard' = '1'
+                'ZoomInDepthOfField' = '0'   # name used by older seasons
+            }
+        }
+        Presets = [ordered]@{
+            'Competitive' = @{
+                Desc = 'Shadows HIGH so enemy shadows show around corners and under doors; reflections, ambient occlusion and visual effects off; lens effects, depth of field, letterbox and V-Sync off; raw mouse input on. Applied to every Ubisoft profile.'
+                Settings = @{ '*' = @{ 'Shadow' = '3'; 'Reflection' = '0'; 'AO' = '0'; 'VFX' = '0'; 'AmbientOcclusion' = '0'; 'ReflectionQuality' = '0' } }
+            }
+            'Max FPS' = @{
+                Desc = 'Everything low for the highest frame rate, but shadows stay on MEDIUM so you still see enemy shadows. Lens effects, depth of field and V-Sync off; raw mouse input on.'
+                Settings = @{
+                    '*' = @{
+                        'Shadow' = '2'; 'Reflection' = '0'; 'AO' = '0'; 'VFX' = '0'; 'Geometry' = '0'; 'Lighting' = '0'; 'Texture' = '0'
+                        'TextureFiltering' = '0'; 'AmbientOcclusion' = '0'; 'ReflectionQuality' = '0'
+                    }
+                }
+            }
+            'Balanced' = @{
+                Desc = 'High shadows plus medium textures, geometry, lighting and effects for a cleaner image; lens effects, depth of field and V-Sync still off.'
+                Settings = @{ '*' = @{ 'Shadow' = '3'; 'Reflection' = '1'; 'AO' = '1'; 'VFX' = '1'; 'Geometry' = '2'; 'Lighting' = '2'; 'Texture' = '2'; 'TextureFiltering' = '2' } }
             }
         }
     }
 )
 
 $GpuPrefKey = 'HKCU:\Software\Microsoft\DirectX\UserGpuPreferences'
+
+# Base settings overlaid with the chosen preset. Ini settings are nested by section.
+function Get-PresetSettings($Game, [string]$Preset) {
+    $merged = @{}
+    foreach ($src in $Game.Base, $Game.Presets[$Preset].Settings) {
+        foreach ($k in $src.Keys) {
+            if ($Game.Format -ne 'Ini') { $merged[$k] = $src[$k]; continue }
+            if (-not $merged.ContainsKey($k)) { $merged[$k] = @{} }
+            foreach ($key in $src[$k].Keys) { $merged[$k][$key] = $src[$k][$key] }
+        }
+    }
+    $merged
+}
 
 function Read-TextFile([string]$Path) {
     $reader = New-Object System.IO.StreamReader($Path, $true)
@@ -731,14 +885,15 @@ function Test-GameRunning($Game) {
     $false
 }
 
-function Invoke-GameOptimize($Game) {
+function Invoke-GameOptimize($Game, [string]$Preset) {
     if (Test-GameRunning $Game) { return }
     $files = @(& $Game.FindConfig)
     if (-not $files) {
         Write-Log "$($Game.Name): settings file not found. Launch the game once, change any setting, close it, then try again." 'WARN'
         return
     }
-    Write-Log "=== Optimize $($Game.Name) ==="
+    Write-Log "=== Optimize $($Game.Name): $Preset preset ==="
+    $settings = Get-PresetSettings $Game $Preset
     $dir = Join-Path $DataDir ("GameBackups\{0}\{1}" -f $Game.Id, (Get-Date -Format 'yyyyMMdd-HHmmss'))
     New-Item -ItemType Directory -Path $dir -Force | Out-Null
     $manifest = @{ Files = @(); Gpu = @() }
@@ -749,7 +904,7 @@ function Invoke-GameOptimize($Game) {
         Copy-Item -LiteralPath $f -Destination $bak -Force
         $manifest.Files += @{ Original = $f; Backup = $bak }
         try {
-            $count = Update-ConfigFile -Path $f -Format $Game.Format -Settings $Game.Settings
+            $count = Update-ConfigFile -Path $f -Format $Game.Format -Settings $settings
             Write-Log "  ${f}: $count setting(s) changed"
         } catch { Write-Log "  ${f}: $($_.Exception.Message)" 'ERROR' }
     }
@@ -759,7 +914,7 @@ function Invoke-GameOptimize($Game) {
         Write-Log "  Windows graphics preference set to High performance for $(Split-Path $exe -Leaf)"
     }
     $manifest | ConvertTo-Json -Depth 4 | Set-Content -Path (Join-Path $dir 'manifest.json') -Encoding UTF8
-    Write-Log "$($Game.Name) optimized. Backup: $dir"
+    Write-Log "$($Game.Name) optimized ($Preset). Backup: $dir"
 }
 
 function Restore-GameOriginal($Game) {
@@ -977,6 +1132,7 @@ $xamlText = @'
               <ColumnDefinition/>
               <ColumnDefinition/>
               <ColumnDefinition/>
+              <ColumnDefinition/>
             </Grid.ColumnDefinitions>
             <Border Grid.Column="0" Style="{StaticResource Card}">
               <DockPanel>
@@ -987,13 +1143,23 @@ $xamlText = @'
             <Border Grid.Column="1" Style="{StaticResource Card}">
               <DockPanel>
                 <StackPanel DockPanel.Dock="Top">
+                  <TextBlock Style="{StaticResource H}" Text="Competitive Tweaks" Margin="0"/>
+                  <TextBlock Text="Core-isolation safe: never turns off Memory Integrity, VBS, CPU mitigations, DEP or Defender, so anti-cheats like Vanguard and FACEIT still work."
+                             Foreground="#5FD38D" FontSize="12" TextWrapping="Wrap" Margin="0,2,0,8"/>
+                </StackPanel>
+                <ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel x:Name="CompetitivePanel"/></ScrollViewer>
+              </DockPanel>
+            </Border>
+            <Border Grid.Column="2" Style="{StaticResource Card}">
+              <DockPanel>
+                <StackPanel DockPanel.Dock="Top">
                   <TextBlock Style="{StaticResource H}" Text="Advanced Tweaks" Margin="0"/>
                   <TextBlock Text="Caution: read each tooltip before selecting." Foreground="#FFB454" FontSize="12" Margin="0,2,0,8"/>
                 </StackPanel>
                 <ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel x:Name="AdvancedPanel"/></ScrollViewer>
               </DockPanel>
             </Border>
-            <Border Grid.Column="2" Style="{StaticResource Card}" Margin="0,0,0,10">
+            <Border Grid.Column="3" Style="{StaticResource Card}" Margin="0,0,0,10">
               <DockPanel>
                 <StackPanel DockPanel.Dock="Top">
                   <TextBlock Style="{StaticResource H}" Text="Preferences" Margin="0"/>
@@ -1019,6 +1185,33 @@ $xamlText = @'
               </StackPanel>
             </DockPanel>
             <WrapPanel x:Name="GamePanel"/>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <TabItem Header="Drivers">
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+          <StackPanel>
+            <TextBlock Style="{StaticResource H}" Text="Your Graphics Card and Motherboard"/>
+            <WrapPanel x:Name="HwPanel">
+              <TextBlock Text="Detecting hardware..." Style="{StaticResource Muted}" Margin="0,0,0,10"/>
+            </WrapPanel>
+            <Border Style="{StaticResource Card}" MaxWidth="1100" HorizontalAlignment="Left">
+              <StackPanel>
+                <DockPanel>
+                  <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
+                    <Button x:Name="BtnScanDrivers" Content="Scan for Driver Updates" Style="{StaticResource AccentButton}"/>
+                    <Button x:Name="BtnInstallDrivers" Content="Install Selected" IsEnabled="False"/>
+                  </StackPanel>
+                  <StackPanel>
+                    <TextBlock Style="{StaticResource H}" Text="Windows Update Drivers"/>
+                    <TextBlock Style="{StaticResource Muted}" TextWrapping="Wrap"
+                      Text="Microsoft's driver catalog, matched to the exact hardware IDs in this PC (chipset, network, audio, Bluetooth, peripherals). Graphics drivers here are usually older than the ones from AMD/NVIDIA/Intel, so they are never pre-selected - use the button on your graphics card above instead."/>
+                  </StackPanel>
+                </DockPanel>
+                <StackPanel x:Name="DriverList" Margin="0,10,0,0"/>
+              </StackPanel>
+            </Border>
           </StackPanel>
         </ScrollViewer>
       </TabItem>
@@ -1170,11 +1363,12 @@ $timer.Add_Tick({
         foreach ($e in $job.PS.Streams.Error) { Write-Log $e.ToString() 'ERROR' }
         $job.PS.Dispose(); $job.RS.Dispose()
         $sync.Busy = $false
-        if ($job.OnComplete) { try { & $job.OnComplete } catch { Write-Log $_.Exception.Message 'ERROR' } }
         Write-Log "=== Finished: $($job.Title) ==="
         $ui.TxtStatus.Text = "Ready - last task: $($job.Title)"
         $ui.Progress.IsIndeterminate = $false
         $ui.Progress.Visibility = 'Hidden'
+        # Last, because it may start a follow-up job.
+        if ($job.OnComplete) { try { & $job.OnComplete } catch { Write-Log $_.Exception.Message 'ERROR' } }
     }
 })
 #endregion
@@ -1219,8 +1413,12 @@ foreach ($cat in $AppCatalog.Keys) {
 # Tweaks
 $TweakChecks = New-Object System.Collections.Generic.List[object]
 foreach ($t in $Tweaks) {
-    $cb = New-Check $t.Name $t.Desc $t.Id
-    $panel = if ($t.Group -eq 'Essential') { $ui.EssentialPanel } else { $ui.AdvancedPanel }
+    # Wrapping label so the four tweak columns stay readable at small window sizes.
+    $label = New-Object System.Windows.Controls.TextBlock
+    $label.Text = $t.Name; $label.TextWrapping = 'Wrap'
+    $cb = New-Check $null $t.Desc $t.Id
+    $cb.Content = $label
+    $panel = @{ Essential = $ui.EssentialPanel; Competitive = $ui.CompetitivePanel; Advanced = $ui.AdvancedPanel }[$t.Group]
     [void]$panel.Children.Add($cb)
     $TweakChecks.Add($cb)
 }
@@ -1301,19 +1499,31 @@ foreach ($g in $Games) {
     $status.FontSize = 12
     $status.Margin = [System.Windows.Thickness]::new(0, 0, 0, 8)
     $desc = New-Object System.Windows.Controls.TextBlock
-    $desc.Text = $g.Desc
     $desc.TextWrapping = 'Wrap'
+    $desc.MinHeight = 64
     $desc.Style = $window.FindResource('Muted')
+    $presetRow = New-Object System.Windows.Controls.DockPanel
+    $presetRow.Margin = [System.Windows.Thickness]::new(0, 0, 0, 8)
+    $presetLabel = New-Object System.Windows.Controls.TextBlock
+    $presetLabel.Text = 'Preset:'; $presetLabel.VerticalAlignment = 'Center'; $presetLabel.Margin = [System.Windows.Thickness]::new(0, 0, 8, 0)
+    $combo = New-Object System.Windows.Controls.ComboBox
+    $combo.Padding = [System.Windows.Thickness]::new(8, 4, 8, 4)
+    foreach ($p in $g.Presets.Keys) { [void]$combo.Items.Add($p) }
+    $combo.Tag = @{ Game = $g; Desc = $desc }
+    $combo.Add_SelectionChanged({ param($s, $e); $s.Tag.Desc.Text = $s.Tag.Game.Presets[[string]$s.SelectedItem].Desc })
+    $combo.SelectedIndex = 0
+    [void]$presetRow.Children.Add($presetLabel); [void]$presetRow.Children.Add($combo)
+    $g.PresetCombo = $combo
     $buttons = New-Object System.Windows.Controls.WrapPanel
     $buttons.Margin = [System.Windows.Thickness]::new(-4, 10, 0, 0)
     $apply = New-Object System.Windows.Controls.Button
-    $apply.Content = 'Optimize'; $apply.Style = $window.FindResource('AccentButton')
+    $apply.Content = 'Apply Preset'; $apply.Style = $window.FindResource('AccentButton')
     $restore = New-Object System.Windows.Controls.Button
     $restore.Content = 'Restore Original'
     $open = New-Object System.Windows.Controls.Button
     $open.Content = 'Open Folder'
     foreach ($b in $apply, $restore, $open) { $b.Tag = $g; [void]$buttons.Children.Add($b) }
-    $apply.Add_Click({ param($s, $e); Invoke-GameOptimize $s.Tag; Update-GameStatus $s.Tag })
+    $apply.Add_Click({ param($s, $e); Invoke-GameOptimize $s.Tag ([string]$s.Tag.PresetCombo.SelectedItem); Update-GameStatus $s.Tag })
     $restore.Add_Click({
         param($s, $e)
         $ok = [System.Windows.MessageBox]::Show("Restore $($s.Tag.Name)'s settings to how they were before Peak Optimizations first changed them?", $AppName, 'YesNo')
@@ -1324,7 +1534,7 @@ foreach ($g in $Games) {
         $f = @(& $s.Tag.FindConfig) | Select-Object -First 1
         if ($f) { Start-Process explorer.exe "/select,`"$f`"" } else { Write-Log "$($s.Tag.Name): settings file not found." 'WARN' }
     })
-    foreach ($c in $status, $desc, $buttons) { [void]$card.Child.Children.Add($c) }
+    foreach ($c in $status, $presetRow, $desc, $buttons) { [void]$card.Child.Children.Add($c) }
     $g.Status = $status; $g.ApplyButton = $apply; $g.RestoreButton = $restore
     [void]$ui.GamePanel.Children.Add($card)
     try { Update-GameStatus $g } catch { $status.Text = "Scan failed: $($_.Exception.Message)" }
@@ -1345,6 +1555,61 @@ function Start-Tweaks([object[]]$TweakList, [bool]$Undo) {
     }
 }
 
+function New-LinkButton([string]$Text, [string]$Url, [switch]$Accent) {
+    $b = New-Object System.Windows.Controls.Button
+    $b.Content = $Text; $b.Tag = $Url; $b.ToolTip = $Url
+    if ($Accent) { $b.Style = $window.FindResource('AccentButton') }
+    $b.Add_Click({ param($s, $e); Start-Process $s.Tag })
+    $b
+}
+
+function New-TextLine([string]$Text, [switch]$Muted, [string]$Color) {
+    $t = New-Object System.Windows.Controls.TextBlock
+    $t.Text = $Text; $t.TextWrapping = 'Wrap'; $t.Margin = [System.Windows.Thickness]::new(0, 0, 0, 4)
+    if ($Muted) { $t.Style = $window.FindResource('Muted') }
+    if ($Color) { $t.Foreground = (New-Object System.Windows.Media.BrushConverter).ConvertFromString($Color) }
+    $t
+}
+
+function Format-Age($Date) {
+    if (-not $Date) { return 'date unknown' }
+    $days = [int]((Get-Date) - $Date).TotalDays
+    '{0:d MMM yyyy} ({1} days old)' -f $Date, $days
+}
+
+function Show-Hardware($Gpus, $Board) {
+    $ui.HwPanel.Children.Clear()
+    foreach ($g in $Gpus) {
+        $card = New-Card $g.Name 400
+        $kind = if ($g.Integrated) { "$($g.Vendor) integrated graphics" } else { "$($g.Vendor) graphics card" }
+        [void]$card.Child.Children.Add((New-TextLine $kind -Muted))
+        [void]$card.Child.Children.Add((New-TextLine "Driver $($g.Version) - $(Format-Age $g.Date)"))
+        if ($g.Date -and ((Get-Date) - $g.Date).TotalDays -gt 120) {
+            [void]$card.Child.Children.Add((New-TextLine 'This driver is over 4 months old - an update is likely available.' -Color '#FFB454'))
+        }
+        if ($g.Integrated -and $g.Vendor -eq 'AMD') {
+            [void]$card.Child.Children.Add((New-TextLine 'Updated by the same AMD Software: Adrenalin package as Radeon graphics cards.' -Muted))
+        }
+        $row = New-Object System.Windows.Controls.WrapPanel
+        $row.Margin = [System.Windows.Thickness]::new(-4, 6, 0, 0)
+        [void]$row.Children.Add((New-LinkButton 'Get Latest Driver' $g.Url -Accent))
+        [void]$card.Child.Children.Add($row)
+        [void]$ui.HwPanel.Children.Add($card)
+    }
+    if ($Board) {
+        $card = New-Card $Board.Name 400
+        [void]$card.Child.Children.Add((New-TextLine 'Motherboard' -Muted))
+        [void]$card.Child.Children.Add((New-TextLine "BIOS $($Board.Bios) - $(Format-Age $Board.BiosDate)"))
+        [void]$card.Child.Children.Add((New-TextLine 'BIOS updates are never flashed automatically. Follow the board maker''s instructions, and don''t turn the PC off while flashing.' -Muted))
+        $row = New-Object System.Windows.Controls.WrapPanel
+        $row.Margin = [System.Windows.Thickness]::new(-4, 6, 0, 0)
+        [void]$row.Children.Add((New-LinkButton 'Drivers and BIOS Page' $Board.SupportUrl -Accent))
+        [void]$row.Children.Add((New-LinkButton "$($Board.ChipsetName) Chipset Driver" $Board.ChipsetUrl))
+        [void]$card.Child.Children.Add($row)
+        [void]$ui.HwPanel.Children.Add($card)
+    }
+}
+
 function Start-InfoRefresh {
     Start-PeakJob -Title 'Read system info' -Script {
         $os = Get-CimInstance Win32_OperatingSystem
@@ -1354,7 +1619,8 @@ function Start-InfoRefresh {
         $disk = Get-CimInstance Win32_LogicalDisk -Filter "DeviceID='$env:SystemDrive'"
         $ver = Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion'
         $up = (Get-Date) - $os.LastBootUpTime
-        $sync.Result = [ordered]@{
+        $hvci = Get-RegValue 'HKLM:\SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity' 'Enabled'
+        $info = [ordered]@{
             'Operating System' = '{0} {1} (build {2}.{3})' -f $os.Caption, $ver.DisplayVersion, $os.BuildNumber, $ver.UBR
             'Processor'        = '{0} - {1} cores / {2} threads' -f $cpu.Name.Trim(), $cpu.NumberOfCores, $cpu.NumberOfLogicalProcessors
             'Graphics'         = $gpu
@@ -1363,11 +1629,70 @@ function Start-InfoRefresh {
             'Uptime'           = '{0}d {1}h {2}m' -f $up.Days, $up.Hours, $up.Minutes
             'Device'           = '{0} {1}' -f $cs.Manufacturer, $cs.Model
             'Power Plan'       = ((powercfg.exe /getactivescheme) -replace '^.*\((.*)\)\s*$', '$1')
+            'Core Isolation'   = if ($hvci -eq 1) { 'Memory Integrity ON (kept on by every tweak here)' } else { 'Memory Integrity off' }
         }
+
+        # Driver pages: use the exact product page when the vendor has one, else the vendor's auto-detect page.
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+        function Test-Url([string]$Url) {
+            try { (Invoke-WebRequest $Url -UseBasicParsing -TimeoutSec 10 -UserAgent 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)').StatusCode -eq 200 } catch { $false }
+        }
+        $amdBase = 'https://www.amd.com/en/support/downloads/drivers.html'
+        $gpus = foreach ($v in Get-CimInstance Win32_VideoController) {
+            if ($v.PNPDeviceID -notmatch 'VEN_(10DE|1002|8086)') { continue }
+            $vendor = @{ '10DE' = 'NVIDIA'; '1002' = 'AMD'; '8086' = 'Intel' }[$Matches[1]]
+            $url = @{
+                NVIDIA = 'https://www.nvidia.com/en-us/drivers/'
+                AMD    = 'https://www.amd.com/en/support/download/drivers.html'
+                Intel  = 'https://www.intel.com/content/www/us/en/support/detect.html'
+            }[$vendor]
+            if ($vendor -eq 'AMD' -and $v.Name -match 'RX\s+(\d)(\d{3})\s*(XTX|XT|GRE)?') {
+                $slug = ('amd-radeon-rx-{0}{1}{2}' -f $Matches[1], $Matches[2], $(if ($Matches[3]) { '-' + $Matches[3].ToLower() } else { '' }))
+                $exact = "$amdBase/graphics/radeon-rx/radeon-rx-$($Matches[1])000-series/$slug.html"
+                if (Test-Url $exact) { $url = $exact }
+            }
+            $date = if ($v.DriverDate) { [datetime]$v.DriverDate } else { $null }
+            [pscustomobject]@{
+                Name       = $v.Name.Trim()
+                Vendor     = $vendor
+                Integrated = $v.Name -match 'Radeon\(TM\) Graphics|Radeon Graphics|UHD|Iris|Vega \d+ Graphics|Intel\(R\) Graphics'
+                Version    = $v.DriverVersion
+                Date       = $date
+                Url        = $url
+            }
+        }
+
+        $bb = Get-CimInstance Win32_BaseBoard
+        $bios = Get-CimInstance Win32_BIOS
+        $maker = "$($bb.Manufacturer)"
+        $domain = switch -Regex ($maker) {
+            'gigabyte' { 'gigabyte.com' } 'asus' { 'asus.com' } 'micro-star|msi' { 'msi.com' } 'asrock' { 'asrock.com' }
+            'biostar' { 'biostar.com.tw' } 'dell|alienware' { 'dell.com' } 'hp|hewlett' { 'hp.com' } 'lenovo' { 'lenovo.com' }
+            'acer' { 'acer.com' } 'nzxt' { 'nzxt.com' } default { $null }
+        }
+        $shortMaker = ($maker -replace '(?i)\s*(technology|computer|international|co\.?,?|ltd\.?|inc\.?|corporation|corp\.?)', '').Trim(' ,.')
+        $query = if ($domain) { "site:$domain $($bb.Product) support drivers BIOS" } else { "$shortMaker $($bb.Product) motherboard support drivers BIOS" }
+        $chipsetUrl = if ($cpu.Manufacturer -match 'Intel') { 'https://www.intel.com/content/www/us/en/support/detect.html' } else { 'https://www.amd.com/en/support/download/drivers.html' }
+        if ($cpu.Manufacturer -match 'AMD' -and $bb.Product -match '\b([ABX])(\d)(\d{2})(E?)\b') {
+            $socket = if ([int]$Matches[2] -ge 6) { 'am5' } else { 'am4' }
+            $exact = "$amdBase/chipsets/$socket/$($Matches[1].ToLower())$($Matches[2])$($Matches[3])$($Matches[4].ToLower()).html"
+            if (Test-Url $exact) { $chipsetUrl = $exact }
+        }
+        $board = [pscustomobject]@{
+            Name        = "$shortMaker $($bb.Product)".Trim()
+            Bios        = $bios.SMBIOSBIOSVersion
+            BiosDate    = if ($bios.ReleaseDate) { [datetime]$bios.ReleaseDate } else { $null }
+            SupportUrl  = 'https://www.bing.com/search?q=' + [uri]::EscapeDataString($query)
+            ChipsetUrl  = $chipsetUrl
+            ChipsetName = if ($cpu.Manufacturer -match 'Intel') { 'Intel' } else { 'AMD' }
+        }
+        $sync.Result = @{ Info = $info; Gpus = @($gpus); Board = $board }
     } -OnComplete {
         if (-not $sync.Result) { return }
+        Show-Hardware $sync.Result.Gpus $sync.Result.Board
+        $info = $sync.Result.Info
         $ui.InfoPanel.Children.Clear()
-        foreach ($k in $sync.Result.Keys) {
+        foreach ($k in $info.Keys) {
             $card = New-Object System.Windows.Controls.Border
             $card.Style = $window.FindResource('Card')
             $card.Width = 345
@@ -1375,7 +1700,7 @@ function Start-InfoRefresh {
             $label = New-Object System.Windows.Controls.TextBlock
             $label.Text = $k.ToUpper(); $label.FontSize = 11; $label.Style = $window.FindResource('Muted')
             $value = New-Object System.Windows.Controls.TextBlock
-            $value.Text = $sync.Result[$k]; $value.FontSize = 14; $value.TextWrapping = 'Wrap'
+            $value.Text = $info[$k]; $value.FontSize = 14; $value.TextWrapping = 'Wrap'
             $value.Margin = [System.Windows.Thickness]::new(0, 4, 0, 0)
             [void]$stack.Children.Add($label); [void]$stack.Children.Add($value)
             $card.Child = $stack
@@ -1578,6 +1903,77 @@ $ui.BtnApplyDns.Add_Click({
         }
         Clear-DnsClientCache
     }
+})
+
+# Drivers (Windows Update catalog)
+$DriverChecks = New-Object System.Collections.Generic.List[object]
+$ui.BtnScanDrivers.Add_Click({
+    Start-PeakJob -Title 'Scan for driver updates' -Script {
+        try {
+            $session = New-Object -ComObject Microsoft.Update.Session
+            $found = $session.CreateUpdateSearcher().Search("IsInstalled=0 and Type='Driver' and IsHidden=0").Updates
+        } catch {
+            Write-Log "Windows Update scan failed: $($_.Exception.Message). If you disabled updates, set Updates to Default or Security first." 'ERROR'
+            return
+        }
+        $sync.Result = @(foreach ($u in $found) {
+            [pscustomobject]@{
+                Id = $u.Identity.UpdateID; Title = $u.Title; Class = "$($u.DriverClass)"; Provider = $u.DriverProvider
+                Date = $u.DriverVerDate; SizeMB = [math]::Round($u.MaxDownloadSize / 1MB, 1)
+            }
+        })
+        Write-Log "$($sync.Result.Count) driver update(s) available for this PC."
+        if (-not $sync.Result.Count -and (Get-RegValue 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate' 'ExcludeWUDriversInQualityUpdate') -eq 1) {
+            Write-Log 'Note: the "Security Updates Only" policy hides drivers from Windows Update. Use the vendor buttons above instead.'
+        }
+    } -OnComplete {
+        $ui.DriverList.Children.Clear(); $DriverChecks.Clear()
+        $list = @($sync.Result)
+        if (-not $list) {
+            [void]$ui.DriverList.Children.Add((New-TextLine 'No driver updates found - everything Windows Update knows about is current.' -Color '#5FD38D'))
+            $ui.BtnInstallDrivers.IsEnabled = $false
+            return
+        }
+        foreach ($d in $list) {
+            $panel = New-Object System.Windows.Controls.StackPanel
+            [void]$panel.Children.Add((New-TextLine $d.Title))
+            $isGpu = $d.Class -match 'Display'
+            $meta = '{0} - {1} - {2:d MMM yyyy} - {3} MB{4}' -f $d.Class, $d.Provider, $d.Date, $d.SizeMB, $(if ($isGpu) { ' - graphics: prefer the vendor driver' } else { '' })
+            [void]$panel.Children.Add((New-TextLine $meta -Muted))
+            $cb = New-Object System.Windows.Controls.CheckBox
+            $cb.Content = $panel; $cb.Tag = $d.Id; $cb.IsChecked = -not $isGpu
+            $cb.Margin = [System.Windows.Thickness]::new(0, 2, 0, 6)
+            [void]$ui.DriverList.Children.Add($cb)
+            $DriverChecks.Add($cb)
+        }
+        $ui.BtnInstallDrivers.IsEnabled = $true
+    }
+})
+$ui.BtnInstallDrivers.Add_Click({
+    $ids = @((Get-Checked $DriverChecks) | ForEach-Object Tag)
+    if (-not $ids) { [System.Windows.MessageBox]::Show('Select at least one driver first.', $AppName) | Out-Null; return }
+    Start-PeakJob -Title "Install $($ids.Count) driver(s)" -Params @{ DriverIds = $ids } -Script {
+        $session = New-Object -ComObject Microsoft.Update.Session
+        $found = $session.CreateUpdateSearcher().Search("IsInstalled=0 and Type='Driver' and IsHidden=0").Updates
+        $coll = New-Object -ComObject Microsoft.Update.UpdateColl
+        foreach ($u in $found) {
+            if ($DriverIds -notcontains $u.Identity.UpdateID) { continue }
+            if (-not $u.EulaAccepted) { $u.AcceptEula() }
+            [void]$coll.Add($u)
+        }
+        if ($coll.Count -eq 0) { Write-Log 'Those drivers are no longer pending.'; return }
+        Write-Log "Downloading $($coll.Count) driver(s)..."
+        $dl = $session.CreateUpdateDownloader(); $dl.Updates = $coll; [void]$dl.Download()
+        Write-Log 'Installing...'
+        $inst = $session.CreateUpdateInstaller(); $inst.Updates = $coll
+        $res = $inst.Install()
+        for ($i = 0; $i -lt $coll.Count; $i++) {
+            $code = $res.GetUpdateResult($i).ResultCode
+            $state = @{ 2 = 'installed'; 3 = 'installed with errors'; 4 = 'FAILED'; 5 = 'aborted' }[[int]$code]
+            Write-Log "  $($coll.Item($i).Title): $state"
+        }
+        if ($res.RebootRequired) { Write-Log 'Restart your PC to finish installing drivers.' }
+    } -OnComplete { $ui.BtnScanDrivers.RaiseEvent((New-Object System.Windows.RoutedEventArgs([System.Windows.Controls.Primitives.ButtonBase]::ClickEvent))) }
 })
 
 # Updates
