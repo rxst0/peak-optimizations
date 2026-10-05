@@ -13,7 +13,7 @@ param(
 
 #region Bootstrap ---------------------------------------------------------------
 $AppName = 'Peak Optimizations'
-$AppVersion = '1.2.0'
+$AppVersion = '1.3.0'
 
 $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(
     [Security.Principal.WindowsBuiltInRole]::Administrator)
@@ -1102,6 +1102,7 @@ $xamlText = @'
             <TextBlock Style="{StaticResource H}" Text="Quick Actions" Margin="0,8,0,8"/>
             <WrapPanel>
               <Button x:Name="BtnQuickRestore" Content="Create Restore Point" Style="{StaticResource AccentButton}"/>
+              <Button x:Name="BtnQuickBackground" Content="End Background Apps"/>
               <Button x:Name="BtnQuickTemp" Content="Clean Temp Files"/>
               <Button x:Name="BtnQuickExplorer" Content="Restart Explorer"/>
               <Button x:Name="BtnQuickRefresh" Content="Refresh Info"/>
@@ -1113,6 +1114,49 @@ $xamlText = @'
             </Border>
           </StackPanel>
         </ScrollViewer>
+      </TabItem>
+
+      <TabItem Header="Background" x:Name="TabBackground">
+        <DockPanel>
+          <Border DockPanel.Dock="Top" Style="{StaticResource Card}" Padding="14,10">
+            <DockPanel>
+              <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                <Button x:Name="BtnBgRefresh" Content="Refresh"/>
+                <Button x:Name="BtnBgEnd" Content="End Selected" Style="{StaticResource AccentButton}"/>
+              </StackPanel>
+              <StackPanel>
+                <TextBlock x:Name="TxtBgSummary" FontWeight="SemiBold" Text="Scanning..." Margin="0,0,0,4"/>
+                <TextBlock Style="{StaticResource Muted}" TextWrapping="Wrap" FontSize="12"
+                  Text="Apps running in the background without a window. Recommended ones are pre-selected - ending them frees memory and CPU and can't harm Windows; they start again when you open them or restart. Windows, security, anti-cheat and driver processes are never listed."/>
+              </StackPanel>
+            </DockPanel>
+          </Border>
+          <Grid>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition/>
+              <ColumnDefinition/>
+            </Grid.ColumnDefinitions>
+            <Border Grid.Column="0" Style="{StaticResource Card}">
+              <DockPanel>
+                <TextBlock DockPanel.Dock="Top" Style="{StaticResource H}" Text="Running in the Background"/>
+                <ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel x:Name="BgPanel" Margin="0,0,6,0"/></ScrollViewer>
+              </DockPanel>
+            </Border>
+            <Border Grid.Column="1" Style="{StaticResource Card}" Margin="0,0,0,10">
+              <DockPanel>
+                <DockPanel DockPanel.Dock="Top">
+                  <Button x:Name="BtnStartupRecommended" DockPanel.Dock="Right" Content="Turn Off Recommended" VerticalAlignment="Top" Margin="8,0,0,0"/>
+                  <StackPanel>
+                    <TextBlock Style="{StaticResource H}" Text="Start with Windows" Margin="0"/>
+                    <TextBlock Style="{StaticResource Muted}" FontSize="12" TextWrapping="Wrap" Margin="0,2,0,8"
+                      Text="Stop apps you don't need from starting when you sign in. Same switch as Task Manager's Startup tab - turn it back on any time."/>
+                  </StackPanel>
+                </DockPanel>
+                <ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel x:Name="StartupPanel" Margin="0,0,6,0"/></ScrollViewer>
+              </DockPanel>
+            </Border>
+          </Grid>
+        </DockPanel>
       </TabItem>
 
       <TabItem Header="Install">
@@ -1325,6 +1369,95 @@ $xamlText = @'
             </Border>
           </Grid>
         </DockPanel>
+      </TabItem>
+
+      <TabItem Header="Display">
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+          <StackPanel>
+            <Border x:Name="DisplayConfirm" Style="{StaticResource Card}" Background="#2B2440" Visibility="Collapsed" MaxWidth="860" HorizontalAlignment="Left">
+              <DockPanel>
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                  <Button x:Name="BtnDisplayKeep" Content="Keep Changes" Style="{StaticResource AccentButton}"/>
+                  <Button x:Name="BtnDisplayRevert" Content="Revert"/>
+                </StackPanel>
+                <TextBlock x:Name="TxtDisplayConfirm" TextWrapping="Wrap" VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,12,0"/>
+              </DockPanel>
+            </Border>
+            <DockPanel Margin="0,0,0,8">
+              <Button x:Name="BtnDisplayRefresh" DockPanel.Dock="Right" Content="Refresh" VerticalAlignment="Top"/>
+              <StackPanel>
+                <TextBlock Style="{StaticResource H}" Text="Monitors"/>
+                <TextBlock Style="{StaticResource Muted}" TextWrapping="Wrap" MaxWidth="820" HorizontalAlignment="Left"
+                  Text="Change the resolution and refresh rate of each monitor. Only modes your monitor reports are listed. If the screen goes black or looks wrong, just wait - it switches back by itself after 15 seconds. Many high-refresh monitors are left at 60 Hz by default; Max Refresh Rate fixes that."/>
+              </StackPanel>
+            </DockPanel>
+            <WrapPanel x:Name="DisplayPanel"/>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <TabItem Header="Peripherals">
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+          <StackPanel>
+            <WrapPanel>
+              <Border Style="{StaticResource Card}" Width="430">
+                <StackPanel>
+                  <TextBlock Style="{StaticResource H}" Text="Mouse"/>
+                  <DockPanel>
+                    <TextBlock x:Name="TxtMouseSpeed" DockPanel.Dock="Right" Style="{StaticResource Muted}"/>
+                    <TextBlock Text="Pointer speed"/>
+                  </DockPanel>
+                  <Slider x:Name="SldMouseSpeed" Minimum="1" Maximum="20" IsSnapToTickEnabled="True" TickFrequency="1" Margin="0,4,0,12"
+                          ToolTip="10 is Windows' default and moves the pointer 1:1 with your mouse. Set sensitivity with DPI and in-game instead."/>
+                  <CheckBox x:Name="ChkMouseAccel" Style="{StaticResource Switch}" Content="Enhance pointer precision (acceleration)"
+                            ToolTip="Off gives consistent aim: the same hand movement always moves the same distance. Recommended off for games."/>
+                  <CheckBox x:Name="ChkMouseSwap" Style="{StaticResource Switch}" Content="Swap left and right buttons (left-handed)"/>
+                  <DockPanel Margin="0,10,0,0">
+                    <TextBlock x:Name="TxtScrollLines" DockPanel.Dock="Right" Style="{StaticResource Muted}"/>
+                    <TextBlock Text="Scroll wheel moves"/>
+                  </DockPanel>
+                  <Slider x:Name="SldScrollLines" Minimum="1" Maximum="20" IsSnapToTickEnabled="True" TickFrequency="1" Margin="0,4,0,12"/>
+                  <DockPanel>
+                    <TextBlock x:Name="TxtDoubleClick" DockPanel.Dock="Right" Style="{StaticResource Muted}"/>
+                    <TextBlock Text="Double-click speed (slower - faster)"/>
+                  </DockPanel>
+                  <Slider x:Name="SldDoubleClick" Minimum="200" Maximum="900" IsSnapToTickEnabled="True" TickFrequency="50" IsDirectionReversed="True" Margin="0,4,0,10"/>
+                  <Button x:Name="BtnMouseDefaults" Content="Windows Defaults" HorizontalAlignment="Left" Margin="-4,0,0,0"/>
+                </StackPanel>
+              </Border>
+              <Border Style="{StaticResource Card}" Width="430">
+                <StackPanel>
+                  <TextBlock Style="{StaticResource H}" Text="Keyboard"/>
+                  <DockPanel>
+                    <TextBlock x:Name="TxtKeyDelay" DockPanel.Dock="Right" Style="{StaticResource Muted}"/>
+                    <TextBlock Text="Repeat delay (long - short)"/>
+                  </DockPanel>
+                  <Slider x:Name="SldKeyDelay" Minimum="0" Maximum="3" IsSnapToTickEnabled="True" TickFrequency="1" TickPlacement="BottomRight" IsDirectionReversed="True" Margin="0,4,0,12"
+                          ToolTip="How long you hold a key before it starts repeating."/>
+                  <DockPanel>
+                    <TextBlock x:Name="TxtKeyRate" DockPanel.Dock="Right" Style="{StaticResource Muted}"/>
+                    <TextBlock Text="Repeat rate (slow - fast)"/>
+                  </DockPanel>
+                  <Slider x:Name="SldKeyRate" Minimum="0" Maximum="31" IsSnapToTickEnabled="True" TickFrequency="1" Margin="0,4,0,12"/>
+                  <TextBlock Text="Test: click below and hold a key" Style="{StaticResource Muted}" Margin="0,0,0,4"/>
+                  <TextBox Padding="6,5" Margin="0,0,0,10"/>
+                  <Button x:Name="BtnKeyboardDefaults" Content="Windows Defaults" HorizontalAlignment="Left" Margin="-4,0,0,0"/>
+                </StackPanel>
+              </Border>
+            </WrapPanel>
+            <Border Style="{StaticResource Card}" MaxWidth="870" HorizontalAlignment="Left">
+              <StackPanel>
+                <DockPanel>
+                  <Button x:Name="BtnRefreshDevices" DockPanel.Dock="Right" Content="Refresh" VerticalAlignment="Top"/>
+                  <TextBlock Style="{StaticResource H}" Text="Connected Keyboards and Mice"/>
+                </DockPanel>
+                <StackPanel x:Name="DevicePanel"/>
+                <TextBlock Style="{StaticResource Muted}" TextWrapping="Wrap" FontSize="12" Margin="0,8,0,0"
+                  Text="DPI, polling rate, lighting and on-board profiles are stored in the mouse or keyboard itself - change those in its maker's software (Logitech G HUB, Razer Synapse, SteelSeries GG, Corsair iCUE...)."/>
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
       </TabItem>
 
       <TabItem Header="Drivers">
@@ -3107,6 +3240,645 @@ $ui.BtnMacroImport.Add_Click({
 })
 #endregion
 
+#region Display, peripherals and background apps -------------------------------------------
+# Small native helper, compiled the first time the Display or Peripherals tab is opened.
+$NativeSource = @'
+using System;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
+
+namespace Peak
+{
+    public class DisplayMode { public int Width { get; set; } public int Height { get; set; } public int Hz { get; set; } }
+
+    public class DisplayInfo
+    {
+        public string Device { get; set; }
+        public string Adapter { get; set; }
+        public string MonitorName { get; set; }
+        public string MonitorId { get; set; }
+        public bool Primary { get; set; }
+        public int Width { get; set; }
+        public int Height { get; set; }
+        public int Hz { get; set; }
+        public int Bits { get; set; }
+        public List<DisplayMode> Modes { get; set; }
+    }
+
+    public static class Native
+    {
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+        struct DISPLAY_DEVICE
+        {
+            public int cb;
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)] public string DeviceName;
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)] public string DeviceString;
+            public int StateFlags;
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)] public string DeviceID;
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)] public string DeviceKey;
+        }
+
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+        struct DEVMODE
+        {
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)] public string dmDeviceName;
+            public short dmSpecVersion, dmDriverVersion, dmSize, dmDriverExtra;
+            public int dmFields;
+            public int dmPositionX, dmPositionY, dmDisplayOrientation, dmDisplayFixedOutput;
+            public short dmColor, dmDuplex, dmYResolution, dmTTOption, dmCollate;
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)] public string dmFormName;
+            public short dmLogPixels;
+            public int dmBitsPerPel, dmPelsWidth, dmPelsHeight, dmDisplayFlags, dmDisplayFrequency;
+            public int dmICMMethod, dmICMIntent, dmMediaType, dmDitherType, dmReserved1, dmReserved2, dmPanningWidth, dmPanningHeight;
+        }
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern bool EnumDisplayDevices(string device, uint index, ref DISPLAY_DEVICE dd, uint flags);
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern bool EnumDisplaySettings(string device, int mode, ref DEVMODE dm);
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int ChangeDisplaySettingsEx(string device, ref DEVMODE dm, IntPtr hwnd, uint flags, IntPtr param);
+        [DllImport("user32.dll", EntryPoint = "SystemParametersInfoW")] static extern bool SpiGetInt(uint action, uint param, ref int value, uint ini);
+        [DllImport("user32.dll", EntryPoint = "SystemParametersInfoW")] static extern bool SpiInts(uint action, uint param, int[] value, uint ini);
+        [DllImport("user32.dll", EntryPoint = "SystemParametersInfoW")] static extern bool SpiSet(uint action, uint param, IntPtr value, uint ini);
+        [DllImport("user32.dll")] static extern uint GetDoubleClickTime();
+        [DllImport("user32.dll")] static extern int GetSystemMetrics(int index);
+
+        const int CURRENT = -1;
+        const uint SAVE = 0x01 | 0x02;   // write to the user profile and tell running apps
+
+        static DEVMODE NewDevMode() { var dm = new DEVMODE(); dm.dmSize = (short)Marshal.SizeOf(typeof(DEVMODE)); return dm; }
+
+        public static List<DisplayInfo> GetDisplays()
+        {
+            var list = new List<DisplayInfo>();
+            for (uint i = 0; i < 64; i++)
+            {
+                var dd = new DISPLAY_DEVICE(); dd.cb = Marshal.SizeOf(typeof(DISPLAY_DEVICE));
+                if (!EnumDisplayDevices(null, i, ref dd, 0)) break;
+                if ((dd.StateFlags & 1) == 0) continue;   // not part of the desktop
+                var info = new DisplayInfo { Device = dd.DeviceName, Adapter = dd.DeviceString, Primary = (dd.StateFlags & 4) != 0, Modes = new List<DisplayMode>() };
+                var mon = new DISPLAY_DEVICE(); mon.cb = Marshal.SizeOf(typeof(DISPLAY_DEVICE));
+                if (EnumDisplayDevices(dd.DeviceName, 0, ref mon, 0)) { info.MonitorName = mon.DeviceString; info.MonitorId = mon.DeviceID; }
+                var cur = NewDevMode();
+                if (EnumDisplaySettings(dd.DeviceName, CURRENT, ref cur)) { info.Width = cur.dmPelsWidth; info.Height = cur.dmPelsHeight; info.Hz = cur.dmDisplayFrequency; info.Bits = cur.dmBitsPerPel; }
+                var seen = new HashSet<string>();
+                for (int m = 0; m < 4096; m++)
+                {
+                    var mode = NewDevMode();
+                    if (!EnumDisplaySettings(dd.DeviceName, m, ref mode)) break;
+                    if (info.Bits > 0 && mode.dmBitsPerPel != info.Bits) continue;
+                    if (seen.Add(mode.dmPelsWidth + "x" + mode.dmPelsHeight + "@" + mode.dmDisplayFrequency))
+                        info.Modes.Add(new DisplayMode { Width = mode.dmPelsWidth, Height = mode.dmPelsHeight, Hz = mode.dmDisplayFrequency });
+                }
+                list.Add(info);
+            }
+            return list;
+        }
+
+        // 0 = done, 1 = restart needed, negative = refused by the driver. test: only check, change nothing.
+        public static int SetMode(string device, int width, int height, int hz, bool test)
+        {
+            var dm = NewDevMode();
+            if (!EnumDisplaySettings(device, CURRENT, ref dm)) return -100;
+            dm.dmPelsWidth = width; dm.dmPelsHeight = height; dm.dmDisplayFrequency = hz;
+            dm.dmFields = 0x80000 | 0x100000 | 0x400000;   // width, height, frequency
+            return ChangeDisplaySettingsEx(device, ref dm, IntPtr.Zero, test ? 2u : 1u, IntPtr.Zero);
+        }
+
+        // Mouse and keyboard settings: the same calls Windows Settings uses, applied instantly and saved.
+        public static int MouseSpeed { get { int v = 10; SpiGetInt(0x0070, 0, ref v, 0); return v; } set { SpiSet(0x0071, 0, (IntPtr)value, SAVE); } }
+        public static bool MouseAcceleration
+        {
+            get { var v = new int[3]; SpiInts(0x0003, 0, v, 0); return v[2] != 0; }
+            set { SpiInts(0x0004, 0, value ? new[] { 6, 10, 1 } : new[] { 0, 0, 0 }, SAVE); }
+        }
+        public static bool SwapButtons { get { return GetSystemMetrics(23) != 0; } set { SpiSet(0x0021, value ? 1u : 0u, IntPtr.Zero, SAVE); } }
+        public static int ScrollLines { get { int v = 3; SpiGetInt(0x0068, 0, ref v, 0); return v; } set { SpiSet(0x0069, (uint)value, IntPtr.Zero, SAVE); } }
+        public static int DoubleClickTime { get { return (int)GetDoubleClickTime(); } set { SpiSet(0x0020, (uint)value, IntPtr.Zero, SAVE); } }
+        public static int KeyboardDelay { get { int v = 1; SpiGetInt(0x0016, 0, ref v, 0); return v; } set { SpiSet(0x0017, (uint)value, IntPtr.Zero, SAVE); } }
+        public static int KeyboardSpeed { get { int v = 31; SpiGetInt(0x000A, 0, ref v, 0); return v; } set { SpiSet(0x000B, (uint)value, IntPtr.Zero, SAVE); } }
+    }
+}
+'@
+
+$NativeReady = $false
+function Initialize-Native {
+    if ($script:NativeReady) { return $true }
+    try {
+        if (-not ('Peak.Native' -as [type])) { Add-Type -TypeDefinition $NativeSource -ErrorAction Stop }
+        $script:NativeReady = $true
+    } catch { Write-Log "Display/peripheral helper failed to load: $($_.Exception.Message)" 'ERROR' }
+    $script:NativeReady
+}
+
+# ---------- Display ----------
+function Get-MonitorNames {
+    $names = @{}
+    foreach ($m in Get-CimInstance -Namespace root\wmi -ClassName WmiMonitorID -ErrorAction SilentlyContinue) {
+        $code = ($m.InstanceName -split '\\')[1]
+        $name = -join ($m.UserFriendlyName | Where-Object { $_ -ne 0 } | ForEach-Object { [char]$_ })
+        if ($code -and $name) { $names[$code] = $name }
+    }
+    $names
+}
+
+function Show-Displays {
+    if (-not (Initialize-Native)) { return }
+    $script:DisplaysLoaded = $true
+    $names = Get-MonitorNames
+    $ui.DisplayPanel.Children.Clear()
+    $n = 0
+    foreach ($d in [Peak.Native]::GetDisplays()) {
+        $n++
+        $code = if ($d.MonitorId) { ($d.MonitorId -split '\\')[1] }
+        $title = if ($code -and $names[$code]) { $names[$code] } elseif ($d.MonitorName) { $d.MonitorName } else { "Display $n" }
+        if ($d.Primary) { $title += '  (main display)' }
+        $card = New-Card $title 420
+        [void]$card.Child.Children.Add((New-TextLine "$($d.Device -replace '^\\\\\.\\', '') on $($d.Adapter)" -Muted))
+        [void]$card.Child.Children.Add((New-TextLine "Now: $($d.Width) x $($d.Height) at $($d.Hz) Hz" -Color '#5FD38D'))
+
+        $grid = New-Object System.Windows.Controls.Grid
+        $grid.Margin = [System.Windows.Thickness]::new(0, 6, 0, 0)
+        foreach ($w in 1, 1) { $c = New-Object System.Windows.Controls.ColumnDefinition; $c.Width = New-Object System.Windows.GridLength($w, 'Star'); $grid.ColumnDefinitions.Add($c) }
+        $resBox = New-Object System.Windows.Controls.ComboBox; $resBox.Padding = [System.Windows.Thickness]::new(6, 4, 6, 4); $resBox.Margin = [System.Windows.Thickness]::new(0, 0, 6, 0)
+        $hzBox = New-Object System.Windows.Controls.ComboBox; $hzBox.Padding = [System.Windows.Thickness]::new(6, 4, 6, 4)
+        [System.Windows.Controls.Grid]::SetColumn($hzBox, 1)
+        [void]$grid.Children.Add($resBox); [void]$grid.Children.Add($hzBox)
+        [void]$card.Child.Children.Add((New-TextLine 'Resolution / refresh rate' -Muted))
+        [void]$card.Child.Children.Add($grid)
+
+        $resolutions = @($d.Modes | Sort-Object { $_.Width * $_.Height }, Width -Descending | ForEach-Object { "$($_.Width) x $($_.Height)" } | Select-Object -Unique)
+        foreach ($r in $resolutions) { [void]$resBox.Items.Add($r) }
+        $state = @{ Display = $d; Res = $resBox; Hz = $hzBox }
+        $resBox.Tag = $state
+        $resBox.Add_SelectionChanged({
+            param($s, $e)
+            $st = $s.Tag
+            $w, $h = ([string]$s.SelectedItem -split ' x ') | ForEach-Object { [int]$_ }
+            $rates = @($st.Display.Modes | Where-Object { $_.Width -eq $w -and $_.Height -eq $h } | ForEach-Object Hz | Sort-Object -Descending -Unique)
+            $st.Hz.Items.Clear()
+            foreach ($r in $rates) { [void]$st.Hz.Items.Add("$r Hz") }
+            $keep = "$($st.Display.Hz) Hz"
+            $st.Hz.SelectedItem = if ($st.Hz.Items.Contains($keep)) { $keep } else { $st.Hz.Items[0] }
+        })
+        $resBox.SelectedItem = "$($d.Width) x $($d.Height)"
+
+        $row = New-Object System.Windows.Controls.WrapPanel
+        $row.Margin = [System.Windows.Thickness]::new(-4, 8, 0, 0)
+        $apply = New-Object System.Windows.Controls.Button; $apply.Content = 'Apply'; $apply.Style = $window.FindResource('AccentButton'); $apply.Tag = $state
+        $apply.Add_Click({
+            param($s, $e)
+            $st = $s.Tag
+            if (-not $st.Res.SelectedItem -or -not $st.Hz.SelectedItem) { return }
+            $w, $h = ([string]$st.Res.SelectedItem -split ' x ') | ForEach-Object { [int]$_ }
+            Set-DisplayMode $st.Display $w $h ([int]([string]$st.Hz.SelectedItem -replace '\D'))
+        })
+        $max = New-Object System.Windows.Controls.Button; $max.Content = 'Max Refresh Rate'; $max.Tag = $state
+        $max.ToolTip = 'Highest refresh rate this monitor supports at its current resolution'
+        $max.Add_Click({
+            param($s, $e)
+            $d = $s.Tag.Display
+            $top = ($d.Modes | Where-Object { $_.Width -eq $d.Width -and $_.Height -eq $d.Height } | Measure-Object Hz -Maximum).Maximum
+            if ($top -le $d.Hz) { Write-Log "$($d.Device): already at its highest refresh rate ($($d.Hz) Hz)."; return }
+            Set-DisplayMode $d $d.Width $d.Height ([int]$top)
+        })
+        [void]$row.Children.Add($apply); [void]$row.Children.Add($max)
+        [void]$card.Child.Children.Add($row)
+
+        $top = ($d.Modes | Where-Object { $_.Width -eq $d.Width -and $_.Height -eq $d.Height } | Measure-Object Hz -Maximum).Maximum
+        if ($top -gt $d.Hz) { [void]$card.Child.Children.Add((New-TextLine "This monitor supports up to $top Hz at this resolution - you're using $($d.Hz) Hz." -Color '#FFB454')) }
+        [void]$ui.DisplayPanel.Children.Add($card)
+    }
+}
+
+$DisplayTimer = New-Object System.Windows.Threading.DispatcherTimer
+$DisplayTimer.Interval = [TimeSpan]::FromSeconds(1)
+$DisplayTimer.Add_Tick({
+    $script:DisplayCountdown--
+    if ($script:DisplayCountdown -gt 0) { $ui.TxtDisplayConfirm.Text = "Keep these display settings? Switching back in $($script:DisplayCountdown) seconds."; return }
+    Complete-DisplayChange $false
+})
+
+function Set-DisplayMode($D, [int]$W, [int]$H, [int]$Hz) {
+    if ($script:DisplayUndo) { return }   # waiting for Keep / Revert on the previous change
+    if ($W -eq $D.Width -and $H -eq $D.Height -and $Hz -eq $D.Hz) { Write-Log 'The display is already using that mode.'; return }
+    $test = [Peak.Native]::SetMode($D.Device, $W, $H, $Hz, $true)
+    if ($test -ne 0) { Write-Log "$W x $H at $Hz Hz isn't accepted by this display (code $test)." 'WARN'; return }
+    $script:DisplayUndo = @{ Device = $D.Device; W = $D.Width; H = $D.Height; Hz = $D.Hz }
+    $r = [Peak.Native]::SetMode($D.Device, $W, $H, $Hz, $false)
+    if ($r -lt 0) { $script:DisplayUndo = $null; Write-Log "Changing the display failed (code $r)." 'ERROR'; return }
+    Write-Log "Display set to $W x $H at $Hz Hz."
+    $script:DisplayCountdown = 15
+    $ui.TxtDisplayConfirm.Text = 'Keep these display settings? Switching back in 15 seconds.'
+    $ui.DisplayConfirm.Visibility = 'Visible'
+    $DisplayTimer.Start()
+}
+
+function Complete-DisplayChange([bool]$Keep) {
+    $DisplayTimer.Stop()
+    $ui.DisplayConfirm.Visibility = 'Collapsed'
+    $u = $script:DisplayUndo
+    $script:DisplayUndo = $null
+    if ($u -and -not $Keep) {
+        [void][Peak.Native]::SetMode($u.Device, $u.W, $u.H, $u.Hz, $false)
+        Write-Log "Display switched back to $($u.W) x $($u.H) at $($u.Hz) Hz."
+    } elseif ($u) { Write-Log 'New display settings kept.' }
+    Show-Displays
+}
+
+$ui.BtnDisplayKeep.Add_Click({ Complete-DisplayChange $true })
+$ui.BtnDisplayRevert.Add_Click({ Complete-DisplayChange $false })
+$ui.BtnDisplayRefresh.Add_Click({ Show-Displays })
+
+# ---------- Peripherals ----------
+$KeyDelayNames = '250 ms (shortest)', '500 ms', '750 ms', '1 second (longest)'
+function Update-PeriphLabels {
+    $speed = [int]$ui.SldMouseSpeed.Value
+    $ui.TxtMouseSpeed.Text = "$speed / 20" + $(if ($speed -eq 10) { '  (default, 1:1)' } else { '' })
+    $ui.TxtScrollLines.Text = "$([int]$ui.SldScrollLines.Value) lines"
+    $ui.TxtDoubleClick.Text = "$([int]$ui.SldDoubleClick.Value) ms"
+    $ui.TxtKeyDelay.Text = $KeyDelayNames[[int]$ui.SldKeyDelay.Value]
+    $ui.TxtKeyRate.Text = '{0:N0} per second' -f (2.5 + [int]$ui.SldKeyRate.Value * 27.5 / 31)
+}
+
+# Sliders apply 300 ms after you stop dragging, so Windows isn't flooded with setting changes.
+$PeriphPending = @{}
+$PeriphTimer = New-Object System.Windows.Threading.DispatcherTimer
+$PeriphTimer.Interval = [TimeSpan]::FromMilliseconds(300)
+$PeriphTimer.Add_Tick({
+    $PeriphTimer.Stop()
+    foreach ($k in @($PeriphPending.Keys)) {
+        try { [Peak.Native]::$k = $PeriphPending[$k] } catch { Write-Log "${k}: $($_.Exception.Message)" 'ERROR' }
+    }
+    if ($PeriphPending.Count) { Write-Log "Updated: $(($PeriphPending.Keys | Sort-Object) -join ', ')." }
+    $PeriphPending.Clear()
+})
+function Set-PeriphLater([string]$Name, $Value) {
+    if ($script:LoadingPeriph -or -not $script:NativeReady) { return }
+    $PeriphPending[$Name] = $Value
+    $PeriphTimer.Stop(); $PeriphTimer.Start()
+}
+
+function Show-Peripherals {
+    if (-not (Initialize-Native)) { return }
+    $script:PeriphLoaded = $true
+    $script:LoadingPeriph = $true
+    try {
+        $ui.SldMouseSpeed.Value = [Peak.Native]::MouseSpeed
+        $ui.ChkMouseAccel.IsChecked = [Peak.Native]::MouseAcceleration
+        $ui.ChkMouseSwap.IsChecked = [Peak.Native]::SwapButtons
+        $ui.SldScrollLines.Value = [math]::Min([math]::Max(1, [Peak.Native]::ScrollLines), 20)
+        $ui.SldDoubleClick.Value = [math]::Min([math]::Max(200, [Peak.Native]::DoubleClickTime), 900)
+        $ui.SldKeyDelay.Value = [Peak.Native]::KeyboardDelay
+        $ui.SldKeyRate.Value = [Peak.Native]::KeyboardSpeed
+    } finally { $script:LoadingPeriph = $false }
+    Update-PeriphLabels
+    Show-InputDevices
+}
+
+function Show-InputDevices {
+    $ui.DevicePanel.Children.Clear()
+    $devices = @(Get-PnpDevice -PresentOnly -Class Keyboard, Mouse -ErrorAction SilentlyContinue | Where-Object Status -eq 'OK')
+    if (-not $devices) { [void]$ui.DevicePanel.Children.Add((New-TextLine 'No keyboards or mice were found.' -Muted)); return }
+    # HID devices have generic names; the USB/Bluetooth node above them has the product name.
+    $parents = @{}
+    foreach ($p in Get-PnpDeviceProperty -InstanceId @($devices.InstanceId) -KeyName DEVPKEY_Device_Parent -ErrorAction SilentlyContinue) { $parents[$p.InstanceId] = $p.Data }
+    $names = @{}
+    $ids = @($parents.Values | Where-Object { $_ } | Select-Object -Unique)
+    if ($ids) { foreach ($p in Get-PnpDeviceProperty -InstanceId $ids -KeyName DEVPKEY_Device_BusReportedDeviceDesc -ErrorAction SilentlyContinue) { if ($p.Data) { $names[$p.InstanceId] = $p.Data } } }
+    $rows = foreach ($d in $devices) {
+        $product = $names[[string]$parents[$d.InstanceId]]
+        $vid = if ($d.InstanceId -match 'VID[_&]([0-9A-F]{4})') { $Matches[1] } else { $null }
+        [pscustomobject]@{
+            Kind = if ($d.Class -eq 'Mouse') { 'Mouse' } else { 'Keyboard' }
+            Name = if ($product) { $product } else { $d.FriendlyName }
+            Connection = if ($d.InstanceId -match 'BTH') { 'Bluetooth' } elseif ($d.InstanceId -match '^HID\\VID|USB') { 'USB' } elseif ($d.InstanceId -match '^ACPI') { 'Built-in' } else { 'Other' }
+            Vid = $vid
+        }
+    }
+    foreach ($g in $rows | Group-Object Kind, Name, Connection | Sort-Object { $_.Group[0].Kind }, Name) {
+        $r = $g.Group[0]
+        $count = if ($g.Count -gt 1) { "  ($($g.Count) interfaces)" } else { '' }
+        [void]$ui.DevicePanel.Children.Add((New-TextLine "$($r.Kind): $($r.Name) - $($r.Connection)$count"))
+    }
+}
+
+$ui.SldMouseSpeed.Add_ValueChanged({ Update-PeriphLabels; Set-PeriphLater 'MouseSpeed' ([int]$ui.SldMouseSpeed.Value) })
+$ui.SldScrollLines.Add_ValueChanged({ Update-PeriphLabels; Set-PeriphLater 'ScrollLines' ([int]$ui.SldScrollLines.Value) })
+$ui.SldDoubleClick.Add_ValueChanged({ Update-PeriphLabels; Set-PeriphLater 'DoubleClickTime' ([int]$ui.SldDoubleClick.Value) })
+$ui.SldKeyDelay.Add_ValueChanged({ Update-PeriphLabels; Set-PeriphLater 'KeyboardDelay' ([int]$ui.SldKeyDelay.Value) })
+$ui.SldKeyRate.Add_ValueChanged({ Update-PeriphLabels; Set-PeriphLater 'KeyboardSpeed' ([int]$ui.SldKeyRate.Value) })
+$ui.ChkMouseAccel.Add_Click({
+    if (-not (Initialize-Native)) { return }
+    [Peak.Native]::MouseAcceleration = [bool]$ui.ChkMouseAccel.IsChecked
+    Write-Log ('Mouse acceleration (enhance pointer precision): {0}' -f $(if ($ui.ChkMouseAccel.IsChecked) { 'On' } else { 'Off' }))
+})
+$ui.ChkMouseSwap.Add_Click({
+    if (-not (Initialize-Native)) { return }
+    [Peak.Native]::SwapButtons = [bool]$ui.ChkMouseSwap.IsChecked
+    Write-Log ('Primary mouse button: {0}' -f $(if ($ui.ChkMouseSwap.IsChecked) { 'Right' } else { 'Left' }))
+})
+$ui.BtnMouseDefaults.Add_Click({
+    if (-not (Initialize-Native)) { return }
+    [Peak.Native]::MouseSpeed = 10; [Peak.Native]::MouseAcceleration = $true; [Peak.Native]::SwapButtons = $false
+    [Peak.Native]::ScrollLines = 3; [Peak.Native]::DoubleClickTime = 500
+    Show-Peripherals; Write-Log 'Mouse settings reset to Windows defaults.'
+})
+$ui.BtnKeyboardDefaults.Add_Click({
+    if (-not (Initialize-Native)) { return }
+    [Peak.Native]::KeyboardDelay = 1; [Peak.Native]::KeyboardSpeed = 31
+    Show-Peripherals; Write-Log 'Keyboard settings reset to Windows defaults.'
+})
+$ui.BtnRefreshDevices.Add_Click({ Show-InputDevices })
+
+# ---------- Background apps ----------
+# 'process|label|end?|note' - end? = 1 means safe and pre-selected for ending.
+$BgKnown = @{}
+@(
+    'msedge|Microsoft Edge (background)|1|Edge keeps running after you close it (Startup boost).'
+    'MicrosoftEdgeUpdate|Edge updater|1|Checks for Edge updates.'
+    'GoogleUpdate|Google updater|1|Checks for Chrome/Google updates.'
+    'GoogleCrashHandler|Google crash reporter|1|Sends Google crash reports.'
+    'GoogleCrashHandler64|Google crash reporter|1|Sends Google crash reports.'
+    'OneDrive|OneDrive|1|Cloud sync pauses until you open OneDrive again.'
+    'PhoneExperienceHost|Phone Link|1|Phone notifications on the PC stop until you open it.'
+    'YourPhone|Phone Link|1|Phone notifications on the PC stop until you open it.'
+    'Widgets|Windows Widgets|1|Reopens when you open the Widgets board.'
+    'WidgetService|Windows Widgets|1|Reopens when you open the Widgets board.'
+    'MicrosoftStartFeedProvider|Windows Widgets|1|Reopens when you open the Widgets board.'
+    'ms-teams|Microsoft Teams|1|Teams notifications stop until you open it.'
+    'MSTeams|Microsoft Teams|1|Teams notifications stop until you open it.'
+    'Teams|Microsoft Teams|1|Teams notifications stop until you open it.'
+    'Skype|Skype|1|Skype notifications stop until you open it.'
+    'Copilot|Microsoft Copilot|1|Reopens when you use Copilot.'
+    'Cortana|Cortana|1|Reopens when you use Cortana.'
+    'GameBar|Xbox Game Bar|1|Reopens when you press Win+G.'
+    'GameBarFTServer|Xbox Game Bar helper|1|Reopens when you press Win+G.'
+    'AdobeARM|Adobe updater|1|Checks for Adobe Reader updates.'
+    'AcrobatNotificationClient|Adobe Acrobat notifications|1|Adobe pop-ups.'
+    'AdobeCollabSync|Adobe Acrobat sync|1|Adobe document sync.'
+    'CCXProcess|Adobe Creative Cloud helper|1|Starts again with Creative Cloud apps.'
+    'CoreSync|Adobe file sync|1|Starts again with Creative Cloud.'
+    'Adobe Desktop Service|Adobe Creative Cloud service|1|Starts again with Creative Cloud apps.'
+    'AdobeIPCBroker|Adobe helper|1|Starts again with Adobe apps.'
+    'jusched|Java updater|1|Checks for Java updates.'
+    'CCleaner64|CCleaner monitoring|1|Background monitoring and pop-ups.'
+    'iTunesHelper|iTunes helper|1|Starts iTunes when an iPhone is plugged in.'
+    'SpotifyWebHelper|Spotify web helper|1|Not needed for Spotify to play.'
+    'lghub_updater|Logitech G HUB updater|1|Checks for G HUB updates.'
+    'Steam|Steam|0|Needed to play Steam games (Rust, Siege on Steam).'
+    'steamwebhelper|Steam|0|Part of Steam.'
+    'EpicGamesLauncher|Epic Games Launcher|0|Needed to play Epic games (Fortnite).'
+    'EpicWebHelper|Epic Games Launcher|0|Needed to play Epic games (Fortnite).'
+    'EpicOnlineServicesUserHelper|Epic Games Launcher|0|Needed to play Epic games (Fortnite).'
+    'EOSOverlayRenderer-Win64-Shipping|Epic Games Launcher|0|Needed to play Epic games (Fortnite).'
+    'MedalEncoder|Medal.tv|0|Clip recording stops.'
+    'StreamDeck|Elgato Stream Deck|0|Stream Deck buttons stop working.'
+    'wallpaper32|Wallpaper Engine|0|Animated wallpaper stops (it already pauses itself during games).'
+    'wallpaper64|Wallpaper Engine|0|Animated wallpaper stops (it already pauses itself during games).'
+    'NVIDIA Share|NVIDIA overlay|0|ShadowPlay recording and the Alt+Z overlay stop.'
+    'nvsphelper64|NVIDIA overlay|0|ShadowPlay recording and the Alt+Z overlay stop.'
+    'upc|Ubisoft Connect|0|Needed to play Ubisoft games (Siege).'
+    'UbisoftConnect|Ubisoft Connect|0|Needed to play Ubisoft games (Siege).'
+    'EADesktop|EA app|0|Needed to play EA games.'
+    'Battle.net|Battle.net|0|Needed to play Blizzard games.'
+    'RiotClientServices|Riot Client|0|Needed to play Riot games.'
+    'GalaxyClient|GOG Galaxy|0|Needed to play GOG games through Galaxy.'
+    'Discord|Discord|0|Voice chat and messages stop.'
+    'Spotify|Spotify|0|Music stops.'
+    'Dropbox|Dropbox|0|Cloud sync pauses.'
+    'GoogleDriveFS|Google Drive|0|Cloud sync pauses.'
+    'Overwolf|Overwolf|0|Game add-ons stop.'
+    'Medal|Medal.tv|0|Clip recording stops.'
+    'iCUE|Corsair iCUE|0|RGB lighting, DPI profiles and macros from iCUE stop.'
+    'lghub|Logitech G HUB|0|Lighting, DPI profiles and macros from G HUB stop.'
+    'lghub_agent|Logitech G HUB|0|Lighting, DPI profiles and macros from G HUB stop.'
+    'RazerAppEngine|Razer Synapse|0|Lighting, DPI profiles and macros from Synapse stop.'
+    'SteelSeriesGG|SteelSeries GG|0|Lighting and device profiles stop.'
+    'SteelSeriesEngine|SteelSeries Engine|0|Lighting and device profiles stop.'
+    'ArmouryCrate|ASUS Armoury Crate|0|Lighting and fan profiles stop.'
+    'ArmourySocketServer|ASUS Armoury Crate|0|Lighting and fan profiles stop.'
+    'ArmouryCrate.UserSessionHelper|ASUS Armoury Crate|0|Lighting and fan profiles stop.'
+    'ArmourySwAgent|ASUS Armoury Crate|0|Lighting and fan profiles stop.'
+    'SignalRgb|SignalRGB|0|RGB lighting stops.'
+    'RadeonSoftware|AMD Software (Adrenalin)|0|Overlay and hotkeys stop; the graphics driver keeps working.'
+    'MSIAfterburner|MSI Afterburner|0|GPU overclock/fan curve and overlay stop.'
+    'RTSS|RivaTuner Statistics Server|0|FPS limiter and overlay stop.'
+) | ForEach-Object {
+    $p = $_ -split '\|'
+    $BgKnown[$p[0]] = @{ Label = $p[1]; End = $p[2] -eq '1'; Note = $p[3] }
+}
+# Never listed: Windows, security, anti-cheat and hardware-driver helpers.
+$BgNever = '^(explorer|dwm|csrss|winlogon|lsass|services|smss|wininit|fontdrvhost|sihost|ctfmon|RuntimeBroker|ShellExperienceHost|' +
+    'StartMenuExperienceHost|SearchHost|SearchApp|TextInputHost|SecurityHealth.*|audiodg|conhost|dllhost|taskhostw|ApplicationFrameHost|' +
+    'SystemSettings|LockApp|smartscreen|WmiPrvSE|svchost|msedgewebview2|powershell|pwsh|WindowsTerminal|OpenConsole|cmd|' +
+    'vgc|vgtray|EasyAntiCheat.*|BEService.*|BEDaisy|FACEIT.*|faceit.*|EAAntiCheat.*|PnkBstr.*|mbam.*|MBAM.*|MsMpEng|NisSrv|' +
+    'avp|avast.*|AvastUI|avg.*|ekrn|egui|bdagent|vsserv|NortonSecurity|' +
+    'NVDisplay\.Container|nvcontainer|atiesrxx|atieclxx|amdfendr.*|AMDRS.*|amdow|RtkAud.*|RtkNGUI.*|Realtek.*|Nahimic.*|A3DUtility|Waves.*|' +
+    'igfx.*|IntelCpHDCPSvc|jhi_service|LMS|esif_.*|SynTP.*|ETDCtrl|Wacom.*|WTablet.*)$'
+
+function Get-BackgroundApps {
+    $session = (Get-Process -Id $PID).SessionId
+    $all = @(Get-Process | Where-Object { $_.SessionId -eq $session })
+    $byId = @{}
+    foreach ($p in $all) { $byId[$p.Id] = $p }
+    $windowed = @{}
+    foreach ($p in $all) { if ($p.MainWindowHandle -ne [IntPtr]::Zero) { $windowed[$p.Name] = $true } }
+    $parentOf = @{}
+    foreach ($w in Get-CimInstance Win32_Process -Filter "SessionId = $session" -Property ProcessId, ParentProcessId -ErrorAction SilentlyContinue) { $parentOf[[int]$w.ProcessId] = [int]$w.ParentProcessId }
+    $entries = [ordered]@{}
+    foreach ($g in $all | Where-Object { $_.Id -ne $PID } | Group-Object Name) {
+        $name = $g.Name
+        if ($name -match $BgNever -or $windowed[$name]) { continue }   # system/protected, or an app you have open
+        # Helpers of an app you have open (e.g. a code editor's background workers) are left alone.
+        $helper = @($g.Group | Where-Object { $pp = $byId[$parentOf[$_.Id]]; $pp -and ($windowed[$pp.Name] -or $pp.Id -eq $PID) })
+        if ($helper.Count -eq $g.Count) { continue }
+        $path = ($g.Group | Where-Object Path | Select-Object -First 1).Path
+        if ($path -and $path.StartsWith($env:SystemRoot, [StringComparison]::OrdinalIgnoreCase)) { continue }
+        $known = $BgKnown[$name]
+        $desc = if ($known) { $known.Label } else { ($g.Group | Where-Object Description | Select-Object -First 1).Description }
+        $parents = @($g.Group | ForEach-Object { $pp = $byId[$parentOf[$_.Id]]; if ($pp -and $pp.Name -ne $name) { $pp.Name } } | Select-Object -Unique)
+        $entries[$name] = [pscustomobject]@{
+            Name        = $name
+            Label       = if ($desc) { $desc } else { $name }
+            Note        = if ($known) { $known.Note }
+                          elseif ($parents -and $parents -notcontains 'explorer') { "Helper started by $(($parents | ForEach-Object { "$_.exe" }) -join ', ')" }
+                          elseif ($path) { $path } else { "$name.exe" }
+            Recommended = [bool]($known -and $known.End)
+            Known       = [bool]$known
+            MB          = [math]::Round(($g.Group | Measure-Object WorkingSet64 -Sum).Sum / 1MB)
+            Ids         = @($g.Group.Id)
+            Parent      = if ($parents.Count -eq 1) { $parents[0] } else { $null }
+        }
+    }
+    # Unknown helper processes are folded into the app that started them...
+    foreach ($key in @($entries.Keys)) {
+        $e = $entries[$key]
+        if ($e.Known -or -not $e.Parent -or -not $entries.Contains($e.Parent)) { continue }
+        $owner = $entries[$e.Parent]
+        $owner.MB += $e.MB; $owner.Ids += $e.Ids
+        $entries.Remove($key)
+    }
+    # ...and known apps made of several processes (e.g. Epic, Medal) show as one entry.
+    foreach ($grp in $entries.Values | Group-Object Label) {
+        if ($grp.Count -eq 1 -or -not $grp.Group[0].Known) { $grp.Group; continue }
+        $first = $grp.Group[0]
+        $first.MB = ($grp.Group | Measure-Object MB -Sum).Sum
+        $first.Ids = @($grp.Group | ForEach-Object { $_.Ids })
+        $first.Recommended = -not @($grp.Group | Where-Object { -not $_.Recommended })
+        $first
+    }
+}
+
+$BgChecks = New-Object System.Collections.Generic.List[object]
+function Update-Background {
+    $apps = @(Get-BackgroundApps)
+    $ui.BgPanel.Children.Clear(); $BgChecks.Clear()
+    $groups = @(
+        @{ Title = 'Recommended to end'; Items = @($apps | Where-Object Recommended | Sort-Object MB -Descending) }
+        @{ Title = 'Other background apps - end only if you know you don''t need them'; Items = @($apps | Where-Object { -not $_.Recommended } | Sort-Object @{ e = 'Known'; Descending = $true }, @{ e = 'MB'; Descending = $true }) }
+    )
+    foreach ($grp in $groups) {
+        if (-not $grp.Items) { continue }
+        $h = New-TextLine $grp.Title -Muted
+        $h.Margin = [System.Windows.Thickness]::new(0, 6, 0, 4)
+        [void]$ui.BgPanel.Children.Add($h)
+        foreach ($a in $grp.Items) {
+            $stack = New-Object System.Windows.Controls.StackPanel
+            $line = New-TextLine ('{0}  -  {1} MB' -f $a.Label, $a.MB)
+            $line.Margin = [System.Windows.Thickness]::new(0)
+            $note = New-TextLine $a.Note -Muted
+            $note.FontSize = 11
+            [void]$stack.Children.Add($line); [void]$stack.Children.Add($note)
+            $cb = New-Object System.Windows.Controls.CheckBox
+            $cb.Content = $stack; $cb.Tag = $a; $cb.IsChecked = $a.Recommended
+            $cb.Margin = [System.Windows.Thickness]::new(0, 2, 0, 4)
+            [void]$ui.BgPanel.Children.Add($cb)
+            $BgChecks.Add($cb)
+        }
+    }
+    $total = ($apps | Measure-Object MB -Sum).Sum
+    $rec = @($apps | Where-Object Recommended)
+    $ui.TxtBgSummary.Text = if ($apps) {
+        '{0} background apps using {1:N0} MB. {2} can be ended safely ({3:N0} MB).' -f $apps.Count, $total, $rec.Count, (($rec | Measure-Object MB -Sum).Sum)
+    } else { 'No unneeded background apps are running.' }
+    if (-not $apps) { [void]$ui.BgPanel.Children.Add((New-TextLine 'Nothing to end right now.' -Color '#5FD38D')) }
+    Update-StartupList
+}
+
+function Stop-BackgroundApps([object[]]$Apps) {
+    $freed = 0
+    foreach ($a in $Apps) {
+        $failed = 0
+        foreach ($id in $a.Ids) { try { Stop-Process -Id $id -Force -ErrorAction Stop } catch { if (Get-Process -Id $id -ErrorAction SilentlyContinue) { $failed++ } } }
+        if ($failed) { Write-Log "  $($a.Label): $failed process(es) could not be ended." 'WARN' } else { Write-Log "  Ended $($a.Label) ($($a.MB) MB)"; $freed += $a.MB }
+    }
+    Write-Log ('Freed about {0:N0} MB of memory.' -f $freed)
+}
+
+$ui.BtnBgEnd.Add_Click({
+    $picked = @((Get-Checked $BgChecks) | ForEach-Object Tag)
+    if (-not $picked) { [System.Windows.MessageBox]::Show('Select at least one app to end.', $AppName) | Out-Null; return }
+    Write-Log "=== End $($picked.Count) background app(s) ==="
+    Stop-BackgroundApps $picked
+    Start-Sleep -Milliseconds 500
+    Update-Background
+})
+$ui.BtnBgRefresh.Add_Click({ Update-Background })
+
+# ---------- Startup apps (same on/off switch as Task Manager's Startup tab) ----------
+$StartupRecommend = '(?i)(OneDrive|Teams|Skype|Spotify|Discord|Steam|EpicGames|Adobe|Acrobat|CCleaner|MicrosoftEdgeAutoLaunch|GoogleUpdate|' +
+    'Opera|Brave|iTunes|Overwolf|Medal|Dropbox|GoogleDrive|Ubisoft|EADesktop|EA app|Battle\.net|Riot|Zoom|Slack|WhatsApp|Telegram|Cortana|Copilot|' +
+    'uTorrent|qBittorrent|Messenger|Phone Link|Widgets)'
+$StartupApproved = 'Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved'
+
+function Get-StartupItems {
+    $sources = @(
+        @{ Path = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'; Approved = "HKCU:\$StartupApproved\Run"; Scope = 'You' }
+        @{ Path = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run'; Approved = "HKLM:\$StartupApproved\Run"; Scope = 'All users' }
+        @{ Path = 'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Run'; Approved = "HKLM:\$StartupApproved\Run32"; Scope = 'All users' }
+    )
+    foreach ($s in $sources) {
+        if (-not (Test-Path $s.Path)) { continue }
+        $key = Get-Item $s.Path
+        foreach ($n in $key.GetValueNames()) {
+            if (-not $n) { continue }
+            [pscustomobject]@{ Name = $n; Command = [string]$key.GetValue($n); Approved = $s.Approved; Scope = $s.Scope }
+        }
+    }
+    $folders = @(
+        @{ Dir = [Environment]::GetFolderPath('Startup'); Approved = "HKCU:\$StartupApproved\StartupFolder"; Scope = 'You' }
+        @{ Dir = [Environment]::GetFolderPath('CommonStartup'); Approved = "HKLM:\$StartupApproved\StartupFolder"; Scope = 'All users' }
+    )
+    foreach ($f in $folders) {
+        Get-ChildItem -LiteralPath $f.Dir -File -ErrorAction SilentlyContinue | Where-Object Name -ne 'desktop.ini' | ForEach-Object {
+            [pscustomobject]@{ Name = $_.Name; Command = $_.FullName; Approved = $f.Approved; Scope = $f.Scope }
+        }
+    }
+}
+
+function Test-StartupEnabled($Item) {
+    $v = $null
+    if (Test-Path $Item.Approved) { $v = (Get-Item $Item.Approved).GetValue($Item.Name) }
+    if ($v -is [byte[]] -and $v.Length) { ($v[0] -band 1) -eq 0 } else { $true }
+}
+
+function Set-StartupEnabled($Item, [bool]$On) {
+    $bytes = if ($On) { [byte[]](2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0) } else { [byte[]](@(3, 0, 0, 0) + [BitConverter]::GetBytes([DateTime]::Now.ToFileTime())) }
+    Set-RegValue $Item.Approved $Item.Name $bytes 'Binary'
+}
+
+$StartupChecks = New-Object System.Collections.Generic.List[object]
+function Update-StartupList {
+    $ui.StartupPanel.Children.Clear(); $StartupChecks.Clear()
+    $items = @(Get-StartupItems | Sort-Object Name)
+    if (-not $items) { [void]$ui.StartupPanel.Children.Add((New-TextLine 'No startup apps found.' -Muted)); return }
+    foreach ($it in $items) {
+        $rec = "$($it.Name) $($it.Command)" -match $StartupRecommend
+        $it | Add-Member -NotePropertyName Recommended -NotePropertyValue $rec -Force
+        $stack = New-Object System.Windows.Controls.StackPanel
+        $title = New-TextLine $it.Name
+        $title.Margin = [System.Windows.Thickness]::new(0)
+        $sub = New-TextLine ("{0}{1}" -f $(if ($rec) { 'Usually safe to turn off  -  ' } else { '' }), ($it.Command -replace '^"?([^"]+?\.(exe|lnk|url|bat|cmd))"?.*$', '$1')) -Muted
+        $sub.FontSize = 11
+        if ($rec) { $sub.Foreground = (New-Object System.Windows.Media.BrushConverter).ConvertFromString('#FFB454') }
+        [void]$stack.Children.Add($title); [void]$stack.Children.Add($sub)
+        $cb = New-Object System.Windows.Controls.CheckBox
+        $cb.Style = $window.FindResource('Switch')
+        $cb.Content = $stack; $cb.Tag = $it; $cb.IsChecked = Test-StartupEnabled $it
+        $cb.ToolTip = "$($it.Command)`nStarts for: $($it.Scope)"
+        $cb.Add_Click({
+            param($s, $e)
+            try {
+                Set-StartupEnabled $s.Tag ([bool]$s.IsChecked)
+                Write-Log ('Start with Windows - {0}: {1}' -f $s.Tag.Name, $(if ($s.IsChecked) { 'On' } else { 'Off' }))
+            } catch { Write-Log "$($s.Tag.Name): $($_.Exception.Message)" 'ERROR'; $s.IsChecked = -not $s.IsChecked }
+        })
+        [void]$ui.StartupPanel.Children.Add($cb)
+        $StartupChecks.Add($cb)
+    }
+}
+
+$ui.BtnStartupRecommended.Add_Click({
+    $targets = @($StartupChecks | Where-Object { $_.Tag.Recommended -and $_.IsChecked })
+    if (-not $targets) { [System.Windows.MessageBox]::Show('No recommended startup apps are turned on.', $AppName) | Out-Null; return }
+    $names = ($targets | ForEach-Object { $_.Tag.Name }) -join "`n"
+    $ok = [System.Windows.MessageBox]::Show("Stop these from starting with Windows?`n`n$names`n`nThey still work when you open them, and you can switch them back on here.", $AppName, 'YesNo', 'Question')
+    if ($ok -ne 'Yes') { return }
+    foreach ($cb in $targets) { Set-StartupEnabled $cb.Tag $false; $cb.IsChecked = $false; Write-Log "Start with Windows - $($cb.Tag.Name): Off" }
+})
+
+# Load each tab's live data when it is opened (keeps startup fast).
+$ui.Tabs.Add_SelectionChanged({
+    param($s, $e)
+    if ($e.OriginalSource -ne $ui.Tabs) { return }   # ignore lists and combo boxes inside the tabs
+    switch ([string]$ui.Tabs.SelectedItem.Header) {
+        'Background' { Update-Background }
+        'Display' { if (-not $script:DisplaysLoaded) { Show-Displays } }
+        'Peripherals' { if (-not $script:PeriphLoaded) { Show-Peripherals } }
+    }
+})
+$ui.BtnQuickBackground.Add_Click({ $ui.Tabs.SelectedItem = $ui.TabBackground })
+#endregion
+
 #region Start ---------------------------------------------------------------------------
 Write-Log "$AppName v$AppVersion ready. Logs and undo backups: $DataDir"
 if ($SelfTest) {
@@ -3182,6 +3954,27 @@ if ($SelfTest) {
     Write-Host ("  Macro editor: {0}" -f $(if ($editorOk) { 'OK' } else { 'FAILED' }))
     Write-Host "    saved: $($saved.Name) / repeat $($saved.Repeat) / key $(Get-KeyName $saved.HotkeyVk) / $savedSteps"
     if (-not $editorOk) { exit 1 }
+
+    # Display / Peripherals / Background: read-only checks. The display mode is only validated (CDS_TEST), never changed.
+    if (-not (Initialize-Native)) { Write-Host '  Native helper: FAILED to compile'; exit 1 }
+    Show-Displays
+    $displays = @([Peak.Native]::GetDisplays())
+    $modeTest = @($displays | ForEach-Object { [Peak.Native]::SetMode($_.Device, $_.Width, $_.Height, $_.Hz, $true) })
+    foreach ($d in $displays) { Write-Host ("    display {0}: {1}x{2} @ {3} Hz, {4} modes, max {5} Hz" -f $d.Device, $d.Width, $d.Height, $d.Hz, $d.Modes.Count, ($d.Modes | Measure-Object Hz -Maximum).Maximum) }
+    Show-Peripherals
+    Write-Host ("    mouse speed {0}, accel {1}, scroll {2}, double-click {3} ms; key delay {4}, rate {5}; devices listed {6}" -f [Peak.Native]::MouseSpeed, [Peak.Native]::MouseAcceleration,
+        [Peak.Native]::ScrollLines, [Peak.Native]::DoubleClickTime, [Peak.Native]::KeyboardDelay, [Peak.Native]::KeyboardSpeed, $ui.DevicePanel.Children.Count)
+    $pendingAfterLoad = $PeriphPending.Count
+    Update-Background
+    $bg = @(Get-BackgroundApps)
+    Write-Host "    background: $($ui.TxtBgSummary.Text)"
+    foreach ($a in $bg | Sort-Object Recommended, MB -Descending | Select-Object -First 12) { Write-Host ("      [{0}] {1} - {2} MB" -f $(if ($a.Recommended) { 'x' } else { ' ' }), $a.Label, $a.MB) }
+    $startup = @(Get-StartupItems)
+    Write-Host ("    startup apps: {0} ({1} on, {2} flagged as usually safe to turn off)" -f $startup.Count, @($StartupChecks | Where-Object IsChecked).Count, @($StartupChecks | Where-Object { $_.Tag.Recommended }).Count)
+    $sysOk = $displays.Count -gt 0 -and $ui.DisplayPanel.Children.Count -eq $displays.Count -and -not @($modeTest | Where-Object { $_ -ne 0 }) -and
+        $pendingAfterLoad -eq 0 -and $ui.DevicePanel.Children.Count -gt 0 -and $ui.StartupPanel.Children.Count -gt 0
+    Write-Host ("  Display / Peripherals / Background: {0}" -f $(if ($sysOk) { 'OK' } else { 'FAILED' }))
+    if (-not $sysOk) { exit 1 }
     exit 0
 }
 $timer.Start()
