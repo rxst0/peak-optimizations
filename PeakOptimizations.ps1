@@ -16,7 +16,7 @@ param(
 
 #region Bootstrap ---------------------------------------------------------------
 $AppName = 'Peak Optimizations'
-$AppVersion = '1.5.0'
+$AppVersion = '1.6.0'
 
 $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(
     [Security.Principal.WindowsBuiltInRole]::Administrator)
@@ -1399,7 +1399,7 @@ $xamlText = @'
             <TextBlock Style="{StaticResource H}" Text="Quick Actions" Margin="0,8,0,8"/>
             <WrapPanel>
               <Button x:Name="BtnBoost" Content="Boost Performance" Style="{StaticResource AccentButton}" FontSize="14" Padding="20,9"
-                      ToolTip="Clears temporary files, browser caches, old crash reports, leftover update downloads and the DNS cache. Your files, passwords and logins are not touched."/>
+                      ToolTip="Clears temporary files, browser caches, old crash reports, leftover update downloads and the DNS cache, and releases cached RAM that isn't in use. Your files, passwords and logins are not touched."/>
               <Button x:Name="BtnQuickRestore" Content="Create Restore Point"/>
               <Button x:Name="BtnQuickBackground" Content="End Background Apps"/>
               <Button x:Name="BtnQuickTemp" Content="Clean Temp Files"/>
@@ -2389,12 +2389,62 @@ $BoostScript = {
 
     Clear-DnsClientCache -ErrorAction SilentlyContinue
     Write-Log '  DNS cache cleared'
-    Write-Log ('Boost complete - {0:N0} MB freed in total.' -f ($total / 1MB))
+
+    # Cached RAM that isn't in use (the standby list): memory Windows keeps filled with files and apps you aren't
+    # using right now. Releasing it is safe - Windows refills it as needed. Memory apps are actively using is left alone.
+    try {
+        if (-not ('Peak.MemoryCleaner' -as [type])) {
+            Add-Type -ErrorAction Stop -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+namespace Peak
+{
+    public static class MemoryCleaner
+    {
+        [StructLayout(LayoutKind.Sequential, Pack = 4)] struct TOKEN_PRIVILEGES { public int Count; public long Luid; public int Attributes; }
+        [DllImport("advapi32.dll", SetLastError = true)] static extern bool OpenProcessToken(IntPtr process, int access, out IntPtr token);
+        [DllImport("advapi32.dll", SetLastError = true, CharSet = CharSet.Unicode)] static extern bool LookupPrivilegeValue(string system, string name, out long luid);
+        [DllImport("advapi32.dll", SetLastError = true)] static extern bool AdjustTokenPrivileges(IntPtr token, bool disableAll, ref TOKEN_PRIVILEGES state, int length, IntPtr previous, IntPtr returnLength);
+        [DllImport("kernel32.dll")] static extern IntPtr GetCurrentProcess();
+        [DllImport("kernel32.dll")] static extern bool CloseHandle(IntPtr handle);
+        [DllImport("ntdll.dll")] static extern int NtSetSystemInformation(int infoClass, ref int info, int length);
+
+        static void EnablePrivilege(string name)
+        {
+            IntPtr token;
+            if (!OpenProcessToken(GetCurrentProcess(), 0x28, out token)) return;   // adjust privileges + query
+            try
+            {
+                var tp = new TOKEN_PRIVILEGES { Count = 1, Attributes = 2 };     // enabled
+                if (LookupPrivilegeValue(null, name, out tp.Luid)) AdjustTokenPrivileges(token, false, ref tp, 0, IntPtr.Zero, IntPtr.Zero);
+            }
+            finally { CloseHandle(token); }
+        }
+
+        // Empties the standby list. Returns 0 on success (an NTSTATUS code otherwise). Needs administrator rights.
+        public static int PurgeStandbyList()
+        {
+            EnablePrivilege("SeProfileSingleProcessPrivilege");
+            int command = 4;   // MemoryPurgeStandbyList
+            return NtSetSystemInformation(80, ref command, 4);   // SystemMemoryListInformation
+        }
+    }
+}
+'@
+        }
+        $freeBefore = [double](Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory * 1KB
+        $status = [Peak.MemoryCleaner]::PurgeStandbyList()
+        $freeAfter = [double](Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory * 1KB
+        if ($status -eq 0) { Write-Log ('  Unused cached RAM released: free memory {0:N1} GB -> {1:N1} GB' -f ($freeBefore / 1GB), ($freeAfter / 1GB)) }
+        else { Write-Log ('  Could not release cached RAM (code 0x{0:X8}) - run the app as administrator.' -f $status) 'WARN' }
+    } catch { Write-Log "  Could not release cached RAM: $($_.Exception.Message)" 'WARN' }
+
+    Write-Log ('Boost complete - {0:N0} MB of disk space freed.' -f ($total / 1MB))
 }
 
 $ui.BtnBoost.Add_Click({
     $ok = [System.Windows.MessageBox]::Show(
-        "Boost Performance will clear:`n`n  - Temporary files`n  - Browser caches (Edge, Chrome, Brave, Firefox)`n  - Old crash reports`n  - Leftover Windows Update downloads`n  - The DNS cache`n`nYour files, browser history, passwords and logins are not touched. Close your browsers first to clear their caches too.`n`nContinue?",
+        "Boost Performance will clear:`n`n  - Temporary files`n  - Browser caches (Edge, Chrome, Brave, Firefox)`n  - Old crash reports`n  - Leftover Windows Update downloads`n  - The DNS cache`n  - Cached RAM that isn't being used`n`nYour files, browser history, passwords and logins are not touched. Close your browsers first to clear their caches too.`n`nContinue?",
         $AppName, 'YesNo', 'Question')
     if ($ok -eq 'Yes') { Start-PeakJob -Title 'Boost Performance' -Script $BoostScript }
 })
