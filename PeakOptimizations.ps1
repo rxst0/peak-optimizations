@@ -1,4 +1,4 @@
-<#
+﻿<#
     Peak Optimizations - a lightweight Windows optimization utility.
     Single file, no dependencies: Windows PowerShell 5.1 + WPF (both ship with Windows 10/11).
     Inspired by Chris Titus Tech's WinUtil (Install / Tweaks / Config / Updates).
@@ -13,7 +13,7 @@ param(
 
 #region Bootstrap ---------------------------------------------------------------
 $AppName = 'Peak Optimizations'
-$AppVersion = '1.1.0'
+$AppVersion = '1.2.0'
 
 $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(
     [Security.Principal.WindowsBuiltInRole]::Administrator)
@@ -164,7 +164,7 @@ $Helpers = {
         $code = $LASTEXITCODE
         $lines = foreach ($l in $out) {
             $s = (("$l" -split "`r")[-1] -replace "`0", '').Trim()
-            if ($s -and $s -match '[A-Za-z]{2}' -and $s -notmatch '[▀-▟]' -and $s -notmatch '\[=+|\d+(\.\d+)?%') { $s }
+            if ($s -and $s -match '[A-Za-z]{2}' -and $s -notmatch '[â–€-â–Ÿ]' -and $s -notmatch '\[=+|\d+(\.\d+)?%') { $s }
         }
         if (-not $Quiet) { foreach ($s in $lines) { Write-Log "  $s" } }
         [pscustomobject]@{ Code = $code; Lines = @($lines) }
@@ -1189,6 +1189,75 @@ $xamlText = @'
         </ScrollViewer>
       </TabItem>
 
+      <TabItem Header="Macros">
+        <DockPanel>
+          <Border DockPanel.Dock="Top" Style="{StaticResource Card}" Padding="14,10">
+            <DockPanel>
+              <CheckBox x:Name="ChkMacrosEnabled" DockPanel.Dock="Right" Style="{StaticResource Switch}" Content="Hotkeys enabled" VerticalAlignment="Center" Margin="16,0,0,0"/>
+              <StackPanel>
+                <TextBlock x:Name="TxtMacroState" Text="Hotkeys off. Turn them on to play macros with their hotkeys." FontWeight="SemiBold" Margin="0,0,0,4"/>
+                <TextBlock TextWrapping="Wrap" Foreground="#FFB454" FontSize="12"
+                  Text="Using macros in online games can break their rules - anti-cheats (Easy Anti-Cheat, BattlEye, Vanguard, Ricochet) may flag automated input and ban the account. Use macros for single-player games, desktop tasks or where the game allows them. Macros only run while this app is open."/>
+              </StackPanel>
+            </DockPanel>
+          </Border>
+          <Grid>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="320"/>
+              <ColumnDefinition/>
+            </Grid.ColumnDefinitions>
+            <Border Grid.Column="0" Style="{StaticResource Card}">
+              <DockPanel>
+                <TextBlock DockPanel.Dock="Top" Style="{StaticResource H}" Text="Your Macros"/>
+                <StackPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
+                  <CheckBox x:Name="ChkRecordMoves" Content="Record mouse movement and click positions" ToolTip="Off: clicks happen wherever the cursor is during playback (best for games). On: the cursor moves to the recorded positions (best for desktop tasks)."/>
+                  <WrapPanel Margin="-4,4,0,0">
+                    <Button x:Name="BtnMacroNew" Content="Record New" Style="{StaticResource AccentButton}" ToolTip="Recording starts after a 3 second countdown. Press F8 to stop."/>
+                    <Button x:Name="BtnMacroDelete" Content="Delete"/>
+                    <Button x:Name="BtnMacroImport" Content="Import"/>
+                    <Button x:Name="BtnMacroExport" Content="Export"/>
+                    <Button x:Name="BtnMacroExportAll" Content="Export All"/>
+                  </WrapPanel>
+                </StackPanel>
+                <ListBox x:Name="LstMacros" Background="Transparent" BorderThickness="0" Foreground="#E6E6F0" FontSize="13"/>
+              </DockPanel>
+            </Border>
+            <Border Grid.Column="1" Style="{StaticResource Card}" Margin="0,0,0,10">
+              <DockPanel x:Name="MacroEditor" IsEnabled="False">
+                <StackPanel DockPanel.Dock="Top">
+                  <WrapPanel Margin="0,0,0,6">
+                    <StackPanel Margin="0,0,12,6">
+                      <TextBlock Text="Name" Style="{StaticResource Muted}" Margin="0,0,0,3"/>
+                      <TextBox x:Name="TxtMacroName" Width="220" Padding="6,4"/>
+                    </StackPanel>
+                    <StackPanel Margin="0,0,12,6">
+                      <TextBlock Text="Hotkey (press to start / stop)" Style="{StaticResource Muted}" Margin="0,0,0,3"/>
+                      <ComboBox x:Name="CmbMacroHotkey" Width="190" Padding="6,4"/>
+                    </StackPanel>
+                    <StackPanel Margin="0,0,12,6">
+                      <TextBlock Text="Repeat" Style="{StaticResource Muted}" Margin="0,0,0,3"/>
+                      <ComboBox x:Name="CmbMacroRepeat" Width="200" Padding="6,4"/>
+                    </StackPanel>
+                    <StackPanel Margin="0,0,12,6">
+                      <TextBlock Text="Speed" Style="{StaticResource Muted}" Margin="0,0,0,3"/>
+                      <ComboBox x:Name="CmbMacroSpeed" Width="90" Padding="6,4"/>
+                    </StackPanel>
+                  </WrapPanel>
+                  <WrapPanel Margin="-4,0,0,6">
+                    <Button x:Name="BtnMacroPlay" Content="Test Play" Style="{StaticResource AccentButton}" ToolTip="Plays once after a 3 second countdown."/>
+                    <Button x:Name="BtnMacroStop" Content="Stop"/>
+                    <Button x:Name="BtnMacroRerecord" Content="Re-record"/>
+                    <Button x:Name="BtnMacroDeleteStep" Content="Delete Step"/>
+                  </WrapPanel>
+                  <TextBlock x:Name="TxtMacroSummary" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,6" Text="Select a macro, or click Record New."/>
+                </StackPanel>
+                <ListBox x:Name="LstMacroSteps" Background="#16161F" BorderThickness="0" Foreground="#C8C8D8" FontFamily="Consolas" FontSize="12"/>
+              </DockPanel>
+            </Border>
+          </Grid>
+        </DockPanel>
+      </TabItem>
+
       <TabItem Header="Drivers">
         <ScrollViewer VerticalScrollBarVisibility="Auto">
           <StackPanel>
@@ -1355,6 +1424,7 @@ $timer.Add_Tick({
     $sb = New-Object System.Text.StringBuilder
     while ($sync.Log.TryDequeue([ref]$line)) { [void]$sb.AppendLine($line) }
     if ($sb.Length -gt 0) { $ui.LogBox.AppendText($sb.ToString()); $ui.LogBox.ScrollToEnd() }
+    if ($script:MacroEngineReady) { Update-MacroState }
 
     $job = $sync.Job
     if ($job -and $job.Handle.IsCompleted) {
@@ -2023,8 +2093,694 @@ $window.Add_Closing({
     param($s, $e)
     if ($sync.Busy) {
         $ok = [System.Windows.MessageBox]::Show("'$($sync.Job.Title)' is still running. Closing now may leave it half-finished.`n`nClose anyway?", $AppName, 'YesNo', 'Warning')
-        if ($ok -ne 'Yes') { $e.Cancel = $true }
+        if ($ok -ne 'Yes') { $e.Cancel = $true; return }
     }
+    if ($script:MacroEngineReady) { [Peak.MacroEngine]::Shutdown() }
+})
+#endregion
+
+#region Macros: record / play keyboard and mouse input -----------------------------------
+# Compiled on first use only, so the app starts as fast as before.
+$MacroSource = @'
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Runtime.InteropServices;
+using System.Threading;
+
+namespace Peak
+{
+    public class MacroEvent
+    {
+        public int T { get; set; }          // milliseconds since the previous step
+        public string Type { get; set; }    // KeyDown, KeyUp, MouseDown, MouseUp, Move, Wheel
+        public int Key { get; set; }        // virtual-key code
+        public string Button { get; set; }  // Left, Right, Middle, X1, X2
+        public int X { get; set; }
+        public int Y { get; set; }
+        public int Delta { get; set; }
+    }
+
+    public class Macro
+    {
+        public Macro() { Name = ""; Repeat = 1; Speed = 1.0; Events = new List<MacroEvent>(); }
+        public string Name { get; set; }
+        public int Repeat { get; set; }     // 0 = until stopped
+        public double Speed { get; set; }
+        public bool UsePositions { get; set; }
+        public List<MacroEvent> Events { get; set; }
+    }
+
+    public static class MacroEngine
+    {
+        delegate IntPtr HookProc(int nCode, IntPtr wParam, IntPtr lParam);
+
+        [StructLayout(LayoutKind.Sequential)] struct POINT { public int x; public int y; }
+        [StructLayout(LayoutKind.Sequential)] struct KBDLLHOOKSTRUCT { public uint vkCode; public uint scanCode; public uint flags; public uint time; public IntPtr extra; }
+        [StructLayout(LayoutKind.Sequential)] struct MSLLHOOKSTRUCT { public POINT pt; public uint mouseData; public uint flags; public uint time; public IntPtr extra; }
+        [StructLayout(LayoutKind.Sequential)] struct MSG { public IntPtr hwnd; public uint message; public IntPtr wParam; public IntPtr lParam; public uint time; public POINT pt; }
+        [StructLayout(LayoutKind.Sequential)] struct MOUSEINPUT { public int dx; public int dy; public uint mouseData; public uint dwFlags; public uint time; public IntPtr extra; }
+        [StructLayout(LayoutKind.Sequential)] struct KEYBDINPUT { public ushort wVk; public ushort wScan; public uint dwFlags; public uint time; public IntPtr extra; }
+        [StructLayout(LayoutKind.Explicit)] struct INPUTUNION { [FieldOffset(0)] public MOUSEINPUT mi; [FieldOffset(0)] public KEYBDINPUT ki; }
+        [StructLayout(LayoutKind.Sequential)] struct INPUT { public uint type; public INPUTUNION u; }
+
+        [DllImport("user32.dll", SetLastError = true)] static extern IntPtr SetWindowsHookEx(int idHook, HookProc fn, IntPtr hMod, uint threadId);
+        [DllImport("user32.dll")] static extern bool UnhookWindowsHookEx(IntPtr hook);
+        [DllImport("user32.dll")] static extern IntPtr CallNextHookEx(IntPtr hook, int nCode, IntPtr wParam, IntPtr lParam);
+        [DllImport("kernel32.dll")] static extern IntPtr GetModuleHandle(string name);
+        [DllImport("kernel32.dll")] static extern uint GetCurrentThreadId();
+        [DllImport("user32.dll")] static extern int GetMessage(out MSG msg, IntPtr hwnd, uint min, uint max);
+        [DllImport("user32.dll")] static extern bool PeekMessage(out MSG msg, IntPtr hwnd, uint min, uint max, uint remove);
+        [DllImport("user32.dll")] static extern bool PostThreadMessage(uint threadId, uint msg, IntPtr wParam, IntPtr lParam);
+        [DllImport("user32.dll", SetLastError = true)] static extern uint SendInput(uint count, INPUT[] inputs, int size);
+        [DllImport("user32.dll")] static extern uint MapVirtualKey(uint code, uint mapType);
+        [DllImport("user32.dll")] static extern int GetSystemMetrics(int index);
+
+        const uint WM_QUIT = 0x0012, WM_MOUSE_HOOK_ON = 0x8001, WM_MOUSE_HOOK_OFF = 0x8002;
+
+        static readonly HookProc keyboardProc = KeyboardProc;   // kept alive so the GC never collects them
+        static readonly HookProc mouseProc = MouseProc;
+        static readonly object gate = new object();
+        static readonly Stopwatch clock = new Stopwatch();
+        static readonly HashSet<int> heldHotkeys = new HashSet<int>();
+        static readonly HashSet<int> extendedKeys = new HashSet<int> { 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x2C, 0x2D, 0x2E, 0x5B, 0x5C, 0x5D, 0x6F, 0x90, 0xA3, 0xA5 };
+        static IntPtr keyboardHook = IntPtr.Zero, mouseHook = IntPtr.Zero;
+        static Thread hookThread;
+        static uint hookThreadId;
+        static Dictionary<int, Macro> bindings = new Dictionary<int, Macro>();
+        static List<MacroEvent> recording = new List<MacroEvent>();
+        static MacroEvent[] finished;
+        static long lastEventMs, lastMoveMs;
+        static volatile bool stopRequested;
+
+        public static int StopRecordKey = 0x77;   // F8
+        public static volatile bool Enabled;
+        public static volatile bool IsRecording;
+        public static volatile bool IsPlaying;
+        public static volatile bool RecordMoves;
+        public static volatile string PlayingName = "";
+        public static bool HooksActive { get { return keyboardHook != IntPtr.Zero; } }
+        public static int RecordedCount { get { lock (gate) { return recording.Count; } } }
+
+        // Hooks live on their own thread with its own message loop, so a busy UI can never lag system input.
+        static void EnsureHookThread()
+        {
+            if (hookThread != null) return;
+            var ready = new ManualResetEvent(false);
+            hookThread = new Thread(delegate ()
+            {
+                MSG msg;
+                PeekMessage(out msg, IntPtr.Zero, 0, 0, 0);   // creates this thread's message queue
+                hookThreadId = GetCurrentThreadId();
+                IntPtr module = GetModuleHandle(null);
+                keyboardHook = SetWindowsHookEx(13, keyboardProc, module, 0);
+                ready.Set();
+                while (GetMessage(out msg, IntPtr.Zero, 0, 0) > 0)
+                {
+                    if (msg.message == WM_MOUSE_HOOK_ON && mouseHook == IntPtr.Zero) mouseHook = SetWindowsHookEx(14, mouseProc, module, 0);
+                    else if (msg.message == WM_MOUSE_HOOK_OFF && mouseHook != IntPtr.Zero) { UnhookWindowsHookEx(mouseHook); mouseHook = IntPtr.Zero; }
+                }
+                if (mouseHook != IntPtr.Zero) { UnhookWindowsHookEx(mouseHook); mouseHook = IntPtr.Zero; }
+                if (keyboardHook != IntPtr.Zero) { UnhookWindowsHookEx(keyboardHook); keyboardHook = IntPtr.Zero; }
+            });
+            hookThread.IsBackground = true;
+            hookThread.Start();
+            ready.WaitOne();
+        }
+
+        static void StopHookThreadIfIdle()
+        {
+            if (Enabled || IsRecording || hookThread == null) return;
+            Thread t = hookThread;
+            hookThread = null;
+            PostThreadMessage(hookThreadId, WM_QUIT, IntPtr.Zero, IntPtr.Zero);
+            if (Thread.CurrentThread != t) t.Join(2000);
+        }
+
+        public static void Enable() { Enabled = true; EnsureHookThread(); }
+        public static void Disable() { Enabled = false; StopHookThreadIfIdle(); }
+        public static void Shutdown() { Enabled = false; StopPlayback(); if (IsRecording) EndRecording(false); StopHookThreadIfIdle(); }
+
+        public static void SetBindings(int[] keys, Macro[] macros)
+        {
+            var map = new Dictionary<int, Macro>();
+            for (int i = 0; i < keys.Length && i < macros.Length; i++) if (keys[i] > 0) map[keys[i]] = macros[i];
+            bindings = map;
+        }
+
+        public static void StartRecording(bool recordMoves)
+        {
+            lock (gate) { recording = new List<MacroEvent>(); finished = null; lastEventMs = 0; lastMoveMs = 0; clock.Restart(); }
+            RecordMoves = recordMoves;
+            EnsureHookThread();
+            IsRecording = true;
+            PostThreadMessage(hookThreadId, WM_MOUSE_HOOK_ON, IntPtr.Zero, IntPtr.Zero);
+        }
+
+        // dropLastClick: recording was stopped by clicking a button in this app, so drop that click.
+        public static void EndRecording(bool dropLastClick)
+        {
+            if (!IsRecording) return;
+            IsRecording = false;
+            PostThreadMessage(hookThreadId, WM_MOUSE_HOOK_OFF, IntPtr.Zero, IntPtr.Zero);
+            lock (gate)
+            {
+                if (dropLastClick)
+                {
+                    int i = recording.FindLastIndex(e => e.Type == "MouseDown" && e.Button == "Left");
+                    if (i >= 0) recording.RemoveRange(i, recording.Count - i);
+                }
+                while (recording.Count > 0 && recording[recording.Count - 1].Type == "Move") recording.RemoveAt(recording.Count - 1);
+                if (recording.Count > 0) recording[0].T = 0;
+                finished = recording.ToArray();
+            }
+            StopHookThreadIfIdle();
+        }
+
+        public static MacroEvent[] TakeRecording() { lock (gate) { var f = finished; finished = null; return f; } }
+
+        static void Record(MacroEvent e)
+        {
+            lock (gate)
+            {
+                long now = clock.ElapsedMilliseconds;
+                if (e.Type == "Move") { if (now - lastMoveMs < 8) return; lastMoveMs = now; }
+                e.T = (int)(now - lastEventMs);
+                lastEventMs = now;
+                recording.Add(e);
+            }
+        }
+
+        static IntPtr KeyboardProc(int nCode, IntPtr wParam, IntPtr lParam)
+        {
+            if (nCode >= 0)
+            {
+                var k = (KBDLLHOOKSTRUCT)Marshal.PtrToStructure(lParam, typeof(KBDLLHOOKSTRUCT));
+                int msg = wParam.ToInt32();
+                bool down = msg == 0x100 || msg == 0x104;
+                int vk = (int)k.vkCode;
+                if ((k.flags & 0x10) == 0)   // ignore injected input, including our own playback
+                {
+                    if (IsRecording)
+                    {
+                        if (vk == StopRecordKey) { if (down) EndRecording(false); return (IntPtr)1; }
+                        Record(new MacroEvent { Type = down ? "KeyDown" : "KeyUp", Key = vk });
+                    }
+                    else if (Enabled)
+                    {
+                        Macro m;
+                        if (bindings.TryGetValue(vk, out m))
+                        {
+                            if (!down) heldHotkeys.Remove(vk);
+                            else if (heldHotkeys.Add(vk)) { if (IsPlaying) StopPlayback(); else Play(m); }
+                            return (IntPtr)1;   // the hotkey itself is not passed to the game
+                        }
+                    }
+                }
+            }
+            return CallNextHookEx(IntPtr.Zero, nCode, wParam, lParam);
+        }
+
+        static IntPtr MouseProc(int nCode, IntPtr wParam, IntPtr lParam)
+        {
+            if (nCode >= 0 && IsRecording)
+            {
+                var m = (MSLLHOOKSTRUCT)Marshal.PtrToStructure(lParam, typeof(MSLLHOOKSTRUCT));
+                if ((m.flags & 0x01) == 0)
+                {
+                    var e = new MacroEvent { X = m.pt.x, Y = m.pt.y };
+                    int hi = (short)((m.mouseData >> 16) & 0xFFFF);
+                    switch (wParam.ToInt32())
+                    {
+                        case 0x200: e.Type = RecordMoves ? "Move" : null; break;
+                        case 0x201: e.Type = "MouseDown"; e.Button = "Left"; break;
+                        case 0x202: e.Type = "MouseUp"; e.Button = "Left"; break;
+                        case 0x204: e.Type = "MouseDown"; e.Button = "Right"; break;
+                        case 0x205: e.Type = "MouseUp"; e.Button = "Right"; break;
+                        case 0x207: e.Type = "MouseDown"; e.Button = "Middle"; break;
+                        case 0x208: e.Type = "MouseUp"; e.Button = "Middle"; break;
+                        case 0x20B: e.Type = "MouseDown"; e.Button = hi == 1 ? "X1" : "X2"; break;
+                        case 0x20C: e.Type = "MouseUp"; e.Button = hi == 1 ? "X1" : "X2"; break;
+                        case 0x20A: e.Type = "Wheel"; e.Delta = hi; break;
+                    }
+                    if (e.Type != null) Record(e);
+                }
+            }
+            return CallNextHookEx(IntPtr.Zero, nCode, wParam, lParam);
+        }
+
+        public static void Play(Macro macro)
+        {
+            if (IsPlaying || macro == null || macro.Events == null || macro.Events.Count == 0) return;
+            MacroEvent[] steps = macro.Events.ToArray();
+            int repeat = macro.Repeat;
+            double speed = macro.Speed > 0 ? macro.Speed : 1.0;
+            bool positions = macro.UsePositions;
+            stopRequested = false;
+            IsPlaying = true;
+            PlayingName = macro.Name ?? "";
+            var t = new Thread(delegate ()
+            {
+                var keys = new HashSet<int>();
+                var buttons = new HashSet<string>();
+                try
+                {
+                    for (int r = 0; (repeat <= 0 || r < repeat) && !stopRequested; r++)
+                    {
+                        foreach (MacroEvent e in steps)
+                        {
+                            if (!Wait((int)(e.T / speed))) break;
+                            Send(e, positions, keys, buttons);
+                        }
+                        Thread.Sleep(1);
+                    }
+                }
+                finally
+                {
+                    // Never leave a key or button stuck down.
+                    foreach (int vk in keys) SendKey(vk, false);
+                    foreach (string b in buttons) SendButton(b, false);
+                    IsPlaying = false;
+                    PlayingName = "";
+                }
+            });
+            t.IsBackground = true;
+            t.Start();
+        }
+
+        public static void StopPlayback() { stopRequested = true; }
+
+        static bool Wait(int ms)
+        {
+            var sw = Stopwatch.StartNew();
+            while (!stopRequested)
+            {
+                long left = ms - sw.ElapsedMilliseconds;
+                if (left <= 0) return true;
+                Thread.Sleep((int)Math.Min(left, 10));
+            }
+            return false;
+        }
+
+        static void Send(MacroEvent e, bool positions, HashSet<int> keys, HashSet<string> buttons)
+        {
+            switch (e.Type)
+            {
+                case "KeyDown": SendKey(e.Key, true); keys.Add(e.Key); break;
+                case "KeyUp": SendKey(e.Key, false); keys.Remove(e.Key); break;
+                case "Move": if (positions) MoveTo(e.X, e.Y); break;
+                case "MouseDown": if (positions) MoveTo(e.X, e.Y); SendButton(e.Button, true); buttons.Add(e.Button); break;
+                case "MouseUp": if (positions) MoveTo(e.X, e.Y); SendButton(e.Button, false); buttons.Remove(e.Button); break;
+                case "Wheel": SendMouse(0, 0, unchecked((uint)e.Delta), 0x0800); break;
+            }
+        }
+
+        static void SendKey(int vk, bool down)
+        {
+            var input = new INPUT { type = 1 };
+            ushort scan = (ushort)MapVirtualKey((uint)vk, 0);
+            uint flags = down ? 0u : 0x0002u;
+            if (scan != 0) flags |= 0x0008;   // scan codes are what DirectInput / raw-input games read
+            if (extendedKeys.Contains(vk)) flags |= 0x0001;
+            input.u.ki.wVk = (ushort)vk;
+            input.u.ki.wScan = scan;
+            input.u.ki.dwFlags = flags;
+            SendInput(1, new[] { input }, Marshal.SizeOf(typeof(INPUT)));
+        }
+
+        static void SendButton(string button, bool down)
+        {
+            uint flags, data = 0;
+            switch (button)
+            {
+                case "Left": flags = down ? 0x0002u : 0x0004u; break;
+                case "Right": flags = down ? 0x0008u : 0x0010u; break;
+                case "Middle": flags = down ? 0x0020u : 0x0040u; break;
+                case "X1": flags = down ? 0x0080u : 0x0100u; data = 1; break;
+                case "X2": flags = down ? 0x0080u : 0x0100u; data = 2; break;
+                default: return;
+            }
+            SendMouse(0, 0, data, flags);
+        }
+
+        static void MoveTo(int x, int y)
+        {
+            int vx = GetSystemMetrics(76), vy = GetSystemMetrics(77), vw = GetSystemMetrics(78), vh = GetSystemMetrics(79);
+            if (vw < 2 || vh < 2) return;
+            int nx = (int)(((long)(x - vx) * 65535) / (vw - 1));
+            int ny = (int)(((long)(y - vy) * 65535) / (vh - 1));
+            SendMouse(nx, ny, 0, 0x0001 | 0x8000 | 0x4000);   // move, absolute, whole virtual desktop
+        }
+
+        static void SendMouse(int dx, int dy, uint data, uint flags)
+        {
+            var input = new INPUT { type = 0 };
+            input.u.mi.dx = dx;
+            input.u.mi.dy = dy;
+            input.u.mi.mouseData = data;
+            input.u.mi.dwFlags = flags;
+            SendInput(1, new[] { input }, Marshal.SizeOf(typeof(INPUT)));
+        }
+    }
+}
+'@
+
+$MacroFile = Join-Path $DataDir 'macros.json'
+$MacroEngineReady = $false
+$MacroStepTypes = 'KeyDown', 'KeyUp', 'MouseDown', 'MouseUp', 'Move', 'Wheel'
+$MacroButtons = 'Left', 'Right', 'Middle', 'X1', 'X2'
+
+# F8 is reserved for "stop recording".
+$MacroKeys = [ordered]@{ 'None' = 0 }
+foreach ($i in 1..24) { if ($i -ne 8) { $MacroKeys["F$i"] = 0x6F + $i } }
+foreach ($i in 0..9) { $MacroKeys["Numpad $i"] = 0x60 + $i }
+$MacroKeys['Numpad *'] = 0x6A; $MacroKeys['Numpad +'] = 0x6B; $MacroKeys['Numpad -'] = 0x6D; $MacroKeys['Numpad /'] = 0x6F; $MacroKeys['Numpad .'] = 0x6E
+$MacroKeys['Insert'] = 0x2D; $MacroKeys['Home'] = 0x24; $MacroKeys['Page Up'] = 0x21; $MacroKeys['Delete'] = 0x2E
+$MacroKeys['End'] = 0x23; $MacroKeys['Page Down'] = 0x22; $MacroKeys['Pause'] = 0x13; $MacroKeys['Scroll Lock'] = 0x91
+$MacroRepeats = [ordered]@{ 'Once' = 1; '2 times' = 2; '3 times' = 3; '5 times' = 5; '10 times' = 10; '25 times' = 25; '100 times' = 100; 'Until hotkey pressed again' = 0 }
+$MacroSpeeds = [ordered]@{ '0.25x' = 0.25; '0.5x' = 0.5; '1x' = 1.0; '1.5x' = 1.5; '2x' = 2.0; '4x' = 4.0 }
+
+function Initialize-MacroEngine {
+    if ($script:MacroEngineReady) { return $true }
+    try {
+        if (-not ('Peak.MacroEngine' -as [type])) { Add-Type -TypeDefinition $MacroSource -ErrorAction Stop }
+        $script:MacroEngineReady = $true
+    } catch { Write-Log "Macro engine failed to load: $($_.Exception.Message)" 'ERROR' }
+    $script:MacroEngineReady
+}
+
+function New-MacroObject([string]$Name) {
+    [pscustomobject]@{ Name = $Name; Hotkey = 'None'; Repeat = 1; Speed = 1.0; MousePositions = $false; Events = @() }
+}
+
+function Get-UniqueMacroName([string]$Base) {
+    $names = @($Macros | ForEach-Object Name)
+    if ($names -notcontains $Base) { return $Base }
+    $n = 2
+    while ($names -contains "$Base ($n)") { $n++ }
+    "$Base ($n)"
+}
+
+# Turns untrusted JSON (imports, the saved file) into a clean macro. Only known step types and numbers survive.
+function ConvertFrom-MacroJson($Obj) {
+    $steps = foreach ($e in @($Obj.Events)) {
+        if (-not $e -or $MacroStepTypes -notcontains [string]$e.Type) { continue }
+        [pscustomobject]@{
+            T      = [math]::Min([math]::Max(0, [int]$e.T), 3600000)
+            Type   = [string]$e.Type
+            Key    = [math]::Min([math]::Max(0, [int]$e.Key), 255)
+            Button = if ($MacroButtons -contains [string]$e.Button) { [string]$e.Button } else { $null }
+            X      = [int]$e.X; Y = [int]$e.Y; Delta = [int]$e.Delta
+        }
+    }
+    $hotkey = [string]$Obj.Hotkey
+    $speed = [double]$Obj.Speed
+    [pscustomobject]@{
+        Name           = if ("$($Obj.Name)".Trim()) { "$($Obj.Name)".Trim() } else { 'Imported macro' }
+        Hotkey         = if ($hotkey -and $MacroKeys.Contains($hotkey)) { $hotkey } else { 'None' }
+        Repeat         = [math]::Max(0, [int]$Obj.Repeat)
+        Speed          = if ($speed -ge 0.1 -and $speed -le 10) { $speed } else { 1.0 }
+        MousePositions = [bool]$Obj.MousePositions
+        Events         = @($steps)
+    }
+}
+
+function ConvertTo-EngineMacro($M) {
+    $em = New-Object Peak.Macro
+    $em.Name = $M.Name; $em.Repeat = $M.Repeat; $em.Speed = $M.Speed; $em.UsePositions = $M.MousePositions
+    foreach ($e in @($M.Events)) {
+        $s = New-Object Peak.MacroEvent
+        $s.T = $e.T; $s.Type = $e.Type; $s.Key = $e.Key; $s.Button = $e.Button; $s.X = $e.X; $s.Y = $e.Y; $s.Delta = $e.Delta
+        $em.Events.Add($s)
+    }
+    $em
+}
+
+function Save-Macros {
+    try { ConvertTo-Json -InputObject @{ PeakMacros = 1; Macros = @($Macros) } -Depth 6 | Set-Content -Path $MacroFile -Encoding UTF8 }
+    catch { Write-Log "Could not save macros: $($_.Exception.Message)" 'ERROR' }
+}
+
+function Read-MacroFile([string]$Path) {
+    $data = Get-Content -Path $Path -Raw | ConvertFrom-Json
+    # Accept a full export ({ Macros: [...] }) or a single macro object.
+    $items = if ($data.PSObject.Properties['Macros']) { @($data.Macros) } else { @($data) }
+    @($items | Where-Object { $_ } | ForEach-Object { ConvertFrom-MacroJson $_ })
+}
+
+function Update-MacroBindings {
+    if (-not $script:MacroEngineReady) { return }
+    $bound = @($Macros | Where-Object { $MacroKeys[[string]$_.Hotkey] -gt 0 -and @($_.Events).Count -gt 0 })
+    [Peak.MacroEngine]::SetBindings([int[]]@($bound | ForEach-Object { $MacroKeys[[string]$_.Hotkey] }), [Peak.Macro[]]@($bound | ForEach-Object { ConvertTo-EngineMacro $_ }))
+}
+
+function Get-SelectedMacro {
+    $i = $ui.LstMacros.SelectedIndex
+    if ($i -ge 0 -and $i -lt $Macros.Count) { $Macros[$i] }
+}
+
+function Update-MacroList($Select) {
+    $ui.LstMacros.Items.Clear()
+    foreach ($m in $Macros) {
+        $key = if ($m.Hotkey -ne 'None') { "  [$($m.Hotkey)]" } else { '' }
+        [void]$ui.LstMacros.Items.Add("$($m.Name)$key  -  $(@($m.Events).Count) steps")
+    }
+    if ($Select) { $ui.LstMacros.SelectedIndex = $Macros.IndexOf($Select) }
+    if ($ui.LstMacros.SelectedIndex -lt 0) { Show-MacroEditor }
+}
+
+function Get-KeyName([int]$Vk) {
+    $k = [System.Windows.Input.KeyInterop]::KeyFromVirtualKey($Vk)
+    if ("$k" -eq 'None') { "VK $Vk" } else { "$k" }
+}
+
+function Format-MacroStep($E, [bool]$Positions) {
+    $at = if ($Positions) { " at ($($E.X), $($E.Y))" } else { '' }
+    $what = switch ($E.Type) {
+        'KeyDown' { "Key $(Get-KeyName $E.Key) down" }
+        'KeyUp' { "Key $(Get-KeyName $E.Key) up" }
+        'MouseDown' { "Mouse $($E.Button) down$at" }
+        'MouseUp' { "Mouse $($E.Button) up$at" }
+        'Move' { "Move to ($($E.X), $($E.Y))" }
+        'Wheel' { 'Scroll ' + $(if ($E.Delta -gt 0) { 'up' } else { 'down' }) }
+    }
+    'wait {0,6} ms   {1}' -f $E.T, $what
+}
+
+function Show-MacroEditor {
+    $m = Get-SelectedMacro
+    $script:LoadingMacro = $true
+    try {
+        $ui.MacroEditor.IsEnabled = [bool]$m
+        $ui.LstMacroSteps.Items.Clear()
+        if (-not $m) { $ui.TxtMacroName.Text = ''; $ui.TxtMacroSummary.Text = 'Select a macro, or click Record New.'; return }
+        $ui.TxtMacroName.Text = $m.Name
+        $ui.CmbMacroHotkey.SelectedItem = [string]$m.Hotkey
+        $ui.CmbMacroRepeat.SelectedItem = @($MacroRepeats.Keys | Where-Object { $MacroRepeats[$_] -eq $m.Repeat })[0]
+        if ($ui.CmbMacroRepeat.SelectedIndex -lt 0) { $ui.CmbMacroRepeat.SelectedIndex = 0 }
+        $ui.CmbMacroSpeed.SelectedItem = @($MacroSpeeds.Keys | Where-Object { $MacroSpeeds[$_] -eq $m.Speed })[0]
+        if ($ui.CmbMacroSpeed.SelectedIndex -lt 0) { $ui.CmbMacroSpeed.SelectedItem = '1x' }
+        $steps = @($m.Events)
+        $shown = [math]::Min($steps.Count, 500)
+        for ($i = 0; $i -lt $shown; $i++) { [void]$ui.LstMacroSteps.Items.Add((Format-MacroStep $steps[$i] $m.MousePositions)) }
+        if ($steps.Count -gt $shown) { [void]$ui.LstMacroSteps.Items.Add("... $($steps.Count - $shown) more steps") }
+        $ms = ($steps | Measure-Object T -Sum).Sum
+        $ui.TxtMacroSummary.Text = '{0} steps, {1:N1} s long. {2}' -f $steps.Count, ($ms / 1000),
+            $(if ($m.MousePositions) { 'Moves the cursor to the recorded positions.' } else { 'Clicks wherever the cursor is.' })
+    } finally { $script:LoadingMacro = $false }
+}
+
+function Update-MacroState {
+    $engine = [Peak.MacroEngine]
+    $done = $engine::TakeRecording()
+    if ($null -ne $done) { Complete-MacroRecording $done }
+    $ui.BtnMacroNew.Content = if ($engine::IsRecording) { 'Stop Recording' } else { 'Record New' }
+    if ($script:MacroCountdown -gt 0) { return }
+    $ui.TxtMacroState.Text = if ($engine::IsRecording) { "Recording... $($engine::RecordedCount) steps so far. Press F8 to stop." }
+    elseif ($engine::IsPlaying) { "Playing '$($engine::PlayingName)'. Press its hotkey again or click Stop to end it." }
+    elseif ($ui.ChkMacrosEnabled.IsChecked) { 'Hotkeys on: press a macro''s hotkey in any app or game to start or stop it.' }
+    else { 'Hotkeys off. Turn them on to play macros with their hotkeys.' }
+}
+
+function Complete-MacroRecording($Steps) {
+    $events = @($Steps | ForEach-Object { [pscustomobject]@{ T = $_.T; Type = $_.Type; Key = $_.Key; Button = $_.Button; X = $_.X; Y = $_.Y; Delta = $_.Delta } })
+    if (-not $events) { Write-Log 'The recording was empty, so nothing was saved.' 'WARN'; return }
+    $m = $script:RecordTarget
+    if (-not $m) {
+        $m = New-MacroObject (Get-UniqueMacroName 'New macro')
+        [void]$Macros.Add($m)
+    }
+    $m.Events = $events
+    $m.MousePositions = [bool]$script:RecordMoves
+    Save-Macros
+    Update-MacroList -Select $m
+    Update-MacroBindings
+    Write-Log "Recorded '$($m.Name)': $($events.Count) steps."
+}
+
+# 3 second countdown so the player can switch to the game before recording or playback starts.
+$MacroTimer = New-Object System.Windows.Threading.DispatcherTimer
+$MacroTimer.Interval = [TimeSpan]::FromSeconds(1)
+$MacroCountdown = 0
+$MacroTimer.Add_Tick({
+    $script:MacroCountdown--
+    if ($script:MacroCountdown -gt 0) { $ui.TxtMacroState.Text = "$($script:MacroCountdownLabel) in $($script:MacroCountdown)... switch to your game or app now."; return }
+    $MacroTimer.Stop()
+    & $script:MacroCountdownAction
+})
+function Start-MacroCountdown([string]$Label, [scriptblock]$Action) {
+    $script:MacroCountdownLabel = $Label
+    $script:MacroCountdownAction = $Action
+    $script:MacroCountdown = 3
+    $ui.TxtMacroState.Text = "$Label in 3... switch to your game or app now."
+    $MacroTimer.Start()
+}
+
+function Start-MacroRecording($Target) {
+    if (-not (Initialize-MacroEngine)) { return }
+    if ([Peak.MacroEngine]::IsPlaying -or $script:MacroCountdown -gt 0) { return }
+    $script:RecordTarget = $Target
+    $script:RecordMoves = [bool]$ui.ChkRecordMoves.IsChecked
+    Start-MacroCountdown 'Recording starts' { [Peak.MacroEngine]::StartRecording($script:RecordMoves) }
+}
+
+# Load saved macros
+$Macros = New-Object System.Collections.ArrayList
+if (Test-Path $MacroFile) {
+    try { foreach ($m in Read-MacroFile $MacroFile) { [void]$Macros.Add($m) } }
+    catch { Write-Log "Could not read saved macros: $($_.Exception.Message)" 'WARN' }
+}
+foreach ($k in $MacroKeys.Keys) { [void]$ui.CmbMacroHotkey.Items.Add($k) }
+foreach ($k in $MacroRepeats.Keys) { [void]$ui.CmbMacroRepeat.Items.Add($k) }
+foreach ($k in $MacroSpeeds.Keys) { [void]$ui.CmbMacroSpeed.Items.Add($k) }
+Update-MacroList
+
+$ui.LstMacros.Add_SelectionChanged({ Show-MacroEditor })
+
+$ui.ChkMacrosEnabled.Add_Click({
+    if (-not (Initialize-MacroEngine)) { $ui.ChkMacrosEnabled.IsChecked = $false; return }
+    Update-MacroBindings
+    if ($ui.ChkMacrosEnabled.IsChecked) { [Peak.MacroEngine]::Enable(); Write-Log 'Macro hotkeys on.' }
+    else { [Peak.MacroEngine]::Disable(); [Peak.MacroEngine]::StopPlayback(); Write-Log 'Macro hotkeys off.' }
+})
+
+$ui.BtnMacroNew.Add_Click({
+    if ($script:MacroEngineReady -and [Peak.MacroEngine]::IsRecording) { [Peak.MacroEngine]::EndRecording($true); return }
+    Start-MacroRecording $null
+})
+$ui.BtnMacroRerecord.Add_Click({
+    $m = Get-SelectedMacro
+    if (-not $m) { return }
+    $ok = [System.Windows.MessageBox]::Show("Replace the steps in '$($m.Name)' with a new recording?", $AppName, 'YesNo')
+    if ($ok -eq 'Yes') { Start-MacroRecording $m }
+})
+
+$ui.BtnMacroPlay.Add_Click({
+    $m = Get-SelectedMacro
+    if (-not $m -or -not @($m.Events).Count -or -not (Initialize-MacroEngine)) { return }
+    if ([Peak.MacroEngine]::IsPlaying -or [Peak.MacroEngine]::IsRecording -or $script:MacroCountdown -gt 0) { return }
+    $script:PendingPlay = ConvertTo-EngineMacro $m
+    $script:PendingPlay.Repeat = 1   # a test always plays once
+    Start-MacroCountdown "Playing '$($m.Name)'" { [Peak.MacroEngine]::Play($script:PendingPlay) }
+})
+$ui.BtnMacroStop.Add_Click({
+    if ($script:MacroCountdown -gt 0) { $MacroTimer.Stop(); $script:MacroCountdown = 0 }
+    if ($script:MacroEngineReady) { [Peak.MacroEngine]::StopPlayback(); if ([Peak.MacroEngine]::IsRecording) { [Peak.MacroEngine]::EndRecording($true) } }
+})
+
+$ui.TxtMacroName.Add_LostFocus({
+    $m = Get-SelectedMacro
+    if ($script:LoadingMacro -or -not $m) { return }
+    $name = $ui.TxtMacroName.Text.Trim()
+    if (-not $name -or $name -eq $m.Name) { $ui.TxtMacroName.Text = $m.Name; return }
+    $m.Name = Get-UniqueMacroName $name
+    Save-Macros; Update-MacroList -Select $m; Update-MacroBindings
+})
+$ui.CmbMacroHotkey.Add_SelectionChanged({
+    $m = Get-SelectedMacro
+    if ($script:LoadingMacro -or -not $m -or -not $ui.CmbMacroHotkey.SelectedItem) { return }
+    $key = [string]$ui.CmbMacroHotkey.SelectedItem
+    if ($key -ne 'None') {
+        foreach ($other in $Macros) {
+            if ($other -ne $m -and $other.Hotkey -eq $key) { $other.Hotkey = 'None'; Write-Log "$key was moved from '$($other.Name)' to '$($m.Name)'." }
+        }
+    }
+    $m.Hotkey = $key
+    Save-Macros; Update-MacroList -Select $m; Update-MacroBindings
+})
+$ui.CmbMacroRepeat.Add_SelectionChanged({
+    $m = Get-SelectedMacro
+    if ($script:LoadingMacro -or -not $m -or -not $ui.CmbMacroRepeat.SelectedItem) { return }
+    $m.Repeat = $MacroRepeats[[string]$ui.CmbMacroRepeat.SelectedItem]
+    Save-Macros; Update-MacroBindings
+})
+$ui.CmbMacroSpeed.Add_SelectionChanged({
+    $m = Get-SelectedMacro
+    if ($script:LoadingMacro -or -not $m -or -not $ui.CmbMacroSpeed.SelectedItem) { return }
+    $m.Speed = $MacroSpeeds[[string]$ui.CmbMacroSpeed.SelectedItem]
+    Save-Macros; Update-MacroBindings
+})
+
+$ui.BtnMacroDeleteStep.Add_Click({
+    $m = Get-SelectedMacro
+    $i = $ui.LstMacroSteps.SelectedIndex
+    if (-not $m -or $i -lt 0 -or $i -ge @($m.Events).Count) { return }
+    $steps = [System.Collections.ArrayList]@($m.Events)
+    $steps.RemoveAt($i)
+    $m.Events = $steps.ToArray()
+    Save-Macros; Update-MacroBindings
+    Update-MacroList -Select $m
+    $ui.LstMacroSteps.SelectedIndex = [math]::Min($i, $ui.LstMacroSteps.Items.Count - 1)
+})
+
+$ui.BtnMacroDelete.Add_Click({
+    $m = Get-SelectedMacro
+    if (-not $m) { return }
+    $ok = [System.Windows.MessageBox]::Show("Delete the macro '$($m.Name)'?", $AppName, 'YesNo', 'Warning')
+    if ($ok -ne 'Yes') { return }
+    $Macros.Remove($m)
+    Save-Macros; Update-MacroList; Update-MacroBindings
+    Write-Log "Deleted macro '$($m.Name)'."
+})
+
+function Export-Macros([object[]]$List, [string]$FileName) {
+    $dlg = New-Object Microsoft.Win32.SaveFileDialog
+    $dlg.Filter = 'Peak macros (*.json)|*.json'
+    $dlg.FileName = ($FileName -replace '[\\/:*?"<>|]', '_') + '.json'
+    if (-not $dlg.ShowDialog()) { return }
+    ConvertTo-Json -InputObject @{ PeakMacros = 1; Macros = @($List) } -Depth 6 | Set-Content -Path $dlg.FileName -Encoding UTF8
+    Write-Log "Exported $($List.Count) macro(s) to $($dlg.FileName)"
+}
+$ui.BtnMacroExport.Add_Click({
+    $m = Get-SelectedMacro
+    if (-not $m) { [System.Windows.MessageBox]::Show('Select a macro to export, or use Export All.', $AppName) | Out-Null; return }
+    Export-Macros @($m) $m.Name
+})
+$ui.BtnMacroExportAll.Add_Click({
+    if (-not $Macros.Count) { [System.Windows.MessageBox]::Show('There are no macros to export yet.', $AppName) | Out-Null; return }
+    Export-Macros @($Macros) 'peak-macros'
+})
+$ui.BtnMacroImport.Add_Click({
+    $dlg = New-Object Microsoft.Win32.OpenFileDialog
+    $dlg.Filter = 'Peak macros (*.json)|*.json|All files (*.*)|*.*'
+    $dlg.Multiselect = $true
+    if (-not $dlg.ShowDialog()) { return }
+    $added = @()
+    foreach ($file in $dlg.FileNames) {
+        try {
+            foreach ($m in Read-MacroFile $file) {
+                if (-not @($m.Events).Count) { continue }
+                $m.Name = Get-UniqueMacroName $m.Name
+                # Never let an imported macro silently take over a hotkey that is already in use.
+                if ($m.Hotkey -ne 'None' -and @($Macros | Where-Object { $_.Hotkey -eq $m.Hotkey })) { $m.Hotkey = 'None' }
+                [void]$Macros.Add($m)
+                $added += $m
+            }
+        } catch { Write-Log "Could not import ${file}: $($_.Exception.Message)" 'ERROR' }
+    }
+    if (-not $added) { Write-Log 'No macros were found in the selected file(s).' 'WARN'; return }
+    Save-Macros; Update-MacroList -Select $added[-1]; Update-MacroBindings
+    Write-Log "Imported $($added.Count) macro(s): $(($added | ForEach-Object Name) -join ', ')"
 })
 #endregion
 
@@ -2054,6 +2810,25 @@ if ($SelfTest) {
     $ok = -not $sync.Job -and $ui.InfoPanel.Children.Count -gt 1 -and $ui.HwPanel.Children.Count -gt 0
     Write-Host ("  Background job: {0} ({1} info cards, {2} hardware cards)" -f $(if ($ok) { 'OK' } else { 'FAILED' }), $ui.InfoPanel.Children.Count, $ui.HwPanel.Children.Count)
     if (-not $ok) { exit 1 }
+
+    # Macros: compile the engine, round-trip JSON (with a bogus step that must be dropped), start/stop hooks.
+    # No input is sent.
+    if (-not (Initialize-MacroEngine)) { Write-Host '  Macro engine: FAILED to compile'; exit 1 }
+    $sample = '{"PeakMacros":1,"Macros":[{"Name":"Test","Hotkey":"F6","Repeat":3,"Speed":2,"Events":[' +
+        '{"T":0,"Type":"KeyDown","Key":87},{"T":120,"Type":"KeyUp","Key":87},{"T":50,"Type":"MouseDown","Button":"Left"},' +
+        '{"T":40,"Type":"MouseUp","Button":"Left"},{"T":5,"Type":"RunCommand","Key":1}]}]}'
+    $tmp = Join-Path $env:TEMP 'peak-macro-selftest.json'
+    Set-Content -Path $tmp -Value $sample -Encoding UTF8
+    $m = @(Read-MacroFile $tmp)[0]
+    $em = ConvertTo-EngineMacro $m
+    Set-Content -Path $tmp -Value (ConvertTo-Json -InputObject @{ PeakMacros = 1; Macros = @($m) } -Depth 6) -Encoding UTF8
+    $again = @(Read-MacroFile $tmp)[0]
+    Remove-Item $tmp -ErrorAction SilentlyContinue
+    [Peak.MacroEngine]::Enable(); $on = [Peak.MacroEngine]::HooksActive
+    [Peak.MacroEngine]::Disable(); $off = -not [Peak.MacroEngine]::HooksActive
+    $macroOk = $m.Events.Count -eq 4 -and $em.Events.Count -eq 4 -and $again.Events.Count -eq 4 -and $again.Hotkey -eq 'F6' -and $again.Speed -eq 2 -and $on -and $off
+    Write-Host ("  Macros: {0} (steps kept {1}/5, round-trip {2}, hooks on={3} off={4})" -f $(if ($macroOk) { 'OK' } else { 'FAILED' }), $m.Events.Count, $again.Events.Count, $on, $off)
+    if (-not $macroOk) { exit 1 }
     exit 0
 }
 $timer.Start()
