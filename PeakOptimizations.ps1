@@ -16,7 +16,7 @@ param(
 
 #region Bootstrap ---------------------------------------------------------------
 $AppName = 'Peak Optimizations'
-$AppVersion = '1.6.0'
+$AppVersion = '1.6.1'
 
 $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(
     [Security.Principal.WindowsBuiltInRole]::Administrator)
@@ -59,7 +59,7 @@ $Helpers = {
         $prefix = if ($Level -eq 'INFO') { '' } else { "${Level}: " }
         $line = '[{0}] {1}{2}' -f (Get-Date -Format 'HH:mm:ss'), $prefix, $Message
         $sync.Log.Enqueue($line)
-        try { Add-Content -Path (Join-Path $sync.DataDir 'peak.log') -Value $line -Encoding UTF8 } catch { }
+        try { Add-Content -Path (Join-Path $sync.DataDir 'peak.log') -Value $line -Encoding UTF8 -ErrorAction Stop } catch { }
     }
 
     function Save-Backup {
@@ -1052,20 +1052,21 @@ $Games = @(
         }
         Presets = [ordered]@{
             'Competitive' = @{
-                Desc = 'Clean image at high FPS: AO, bloom, sun shafts, volumetric clouds, grass displacement, contact shadows and gibs off; lowest shadow lights and water. 1 queued frame and no V-Sync for lower input lag.'
+                Desc = 'Clean image at high FPS: AO, bloom, sun shafts, volumetric clouds, grass displacement, contact shadows and gibs off; fewest shadow lights, lowest water. 1 queued frame and no V-Sync for lower input lag.'
                 Settings = @{
                     'effects.ao' = 'False'; 'effects.bloom' = 'False'; 'effects.shafts' = 'False'; 'graphics.volumetric_clouds' = '0'
-                    'grass.displacement' = 'False'; 'graphics.contactshadows' = 'False'; 'effects.maxgibs' = '0'; 'graphics.shadowlights' = '0'
+                    'grass.displacement' = 'False'; 'graphics.contactshadows' = 'False'; 'effects.maxgibs' = '0'; 'graphics.shadowlights' = '1'
                     'water.quality' = '0'; 'water.reflections' = '0'
                 }
             }
             'Max FPS' = @{
-                Desc = 'Competitive plus lowest grass, trees, terrain and particles. Less grass also makes players easier to spot.'
+                Desc = 'Everything as low as Rust allows: low shadows and mesh detail, lowest grass, trees, terrain, particles and water, 1x texture filtering, no parallax. Less grass also makes players easier to spot. Draw distance is kept so you still see far.'
                 Settings = @{
                     'effects.ao' = 'False'; 'effects.bloom' = 'False'; 'effects.shafts' = 'False'; 'graphics.volumetric_clouds' = '0'
-                    'grass.displacement' = 'False'; 'graphics.contactshadows' = 'False'; 'effects.maxgibs' = '0'; 'graphics.shadowlights' = '0'
+                    'grass.displacement' = 'False'; 'graphics.contactshadows' = 'False'; 'effects.maxgibs' = '0'; 'graphics.shadowlights' = '1'
                     'water.quality' = '0'; 'water.reflections' = '0'
-                    'grass.quality' = '0'; 'tree.quality' = '0'; 'tree.meshes' = '0'; 'terrain.quality' = '0'; 'particle.quality' = '0'
+                    'grass.quality' = '0'; 'tree.quality' = '0'; 'tree.meshes' = '10'; 'terrain.quality' = '0'; 'particle.quality' = '0'
+                    'graphics.shadowmode' = '1'; 'mesh.quality' = '50'; 'graphics.af' = '1'; 'graphics.parallax' = '0'
                 }
             }
             'Balanced' = @{
@@ -1146,12 +1147,13 @@ function Read-TextFile([string]$Path) {
     @{ Text = $text; Encoding = $enc }
 }
 
-function Update-ConfigFile([string]$Path, [string]$Format, [hashtable]$Settings) {
+function Update-ConfigFile([string]$Path, [string]$Format, [hashtable]$Settings, [switch]$CheckOnly) {
     $file = Read-TextFile $Path
     $nl = if ($file.Text -match "`r`n") { "`r`n" } else { "`n" }
     $lines = $file.Text -split "`r?`n"
     $section = ''
     $changed = 0
+    $differ = New-Object System.Collections.Generic.List[string]
     for ($i = 0; $i -lt $lines.Count; $i++) {
         if ($Format -eq 'Ini') {
             if ($lines[$i] -match '^\s*\[(.+)\]\s*$') { $section = $Matches[1]; continue }
@@ -1169,7 +1171,9 @@ function Update-ConfigFile([string]$Path, [string]$Format, [hashtable]$Settings)
             $lines[$i] = '{0} "{1}"' -f $key, $Settings[$key]
         }
         $changed++
+        $differ.Add($key)
     }
+    if ($CheckOnly) { return $differ.ToArray() }
     if ($changed) { [System.IO.File]::WriteAllText($Path, ($lines -join $nl), $file.Encoding) }
     $changed
 }
@@ -1193,7 +1197,7 @@ function Invoke-GameOptimize($Game, [string]$Preset) {
     $settings = Get-PresetSettings $Game $Preset
     $dir = Join-Path $DataDir ("GameBackups\{0}\{1}" -f $Game.Id, (Get-Date -Format 'yyyyMMdd-HHmmss'))
     New-Item -ItemType Directory -Path $dir -Force | Out-Null
-    $manifest = @{ Files = @(); Gpu = @() }
+    $manifest = @{ Files = @(); Gpu = @(); Preset = $Preset }
     $n = 0
     foreach ($f in $files) {
         $n++
@@ -2072,11 +2076,23 @@ $Brush = New-Object System.Windows.Media.BrushConverter
 function Update-GameStatus($Game) {
     $files = @(& $Game.FindConfig)
     $exes = @(& $Game.FindExe)
-    $hasBackup = [bool](Get-ChildItem (Join-Path $DataDir "GameBackups\$($Game.Id)") -Directory -ErrorAction SilentlyContinue)
+    $backups = @(Get-ChildItem (Join-Path $DataDir "GameBackups\$($Game.Id)") -Directory -ErrorAction SilentlyContinue | Sort-Object Name)
+    $hasBackup = [bool]$backups
     if ($files) {
         $Game.Status.Text = 'Settings file found' + $(if ($files.Count -gt 1) { " ($($files.Count) profiles)" } else { '' }) +
-            $(if ($exes) { ' - game install found' } else { '' }) + $(if ($hasBackup) { ' - optimized (backup saved)' } else { '' })
+            $(if ($exes) { ' - game install found' } else { '' })
         $Game.Status.Foreground = $Brush.ConvertFromString('#5FD38D')
+        # Did the game keep the last preset? Games rewrite their settings when they close and reset values they don't allow.
+        $preset = $null
+        if ($hasBackup) { try { $preset = (Get-Content (Join-Path $backups[-1].FullName 'manifest.json') -Raw | ConvertFrom-Json).Preset } catch { } }
+        if ($preset -and $Game.Presets.Contains([string]$preset)) {
+            $want = Get-PresetSettings $Game ([string]$preset)
+            $reverted = @($files | ForEach-Object { Update-ConfigFile -Path $_ -Format $Game.Format -Settings $want -CheckOnly } | Select-Object -Unique)
+            if ($reverted) {
+                $Game.Status.Text += " - $($Game.Name) changed $($reverted.Count) setting(s) back: $($reverted -join ', '). Click Apply Preset again with the game closed."
+                $Game.Status.Foreground = $Brush.ConvertFromString('#FFB454')
+            } else { $Game.Status.Text += " - $preset preset in place" }
+        } elseif ($hasBackup) { $Game.Status.Text += ' - optimized (backup saved)' }
     } else {
         $Game.Status.Text = 'Not found - launch the game once, then Re-scan'
         $Game.Status.Foreground = $Brush.ConvertFromString('#9A9AB0')
@@ -2089,6 +2105,7 @@ foreach ($g in $Games) {
     $card = New-Card $g.Name 360
     $status = New-Object System.Windows.Controls.TextBlock
     $status.FontSize = 12
+    $status.TextWrapping = 'Wrap'
     $status.Margin = [System.Windows.Thickness]::new(0, 0, 0, 8)
     $desc = New-Object System.Windows.Controls.TextBlock
     $desc.TextWrapping = 'Wrap'
