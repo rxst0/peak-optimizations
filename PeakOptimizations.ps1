@@ -16,7 +16,7 @@ param(
 
 #region Bootstrap ---------------------------------------------------------------
 $AppName = 'Peak Optimizations'
-$AppVersion = '1.6.1'
+$AppVersion = '1.7.0'
 
 $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(
     [Security.Principal.WindowsBuiltInRole]::Administrator)
@@ -998,6 +998,26 @@ function Get-EpicGameDirs([string]$DisplayName) {
 
 # Only keys that already exist in the file are changed, so nothing unknown is ever added.
 # Resolution, sensitivity, keybinds and FPS caps are never touched.
+# Shared presets for Unreal Engine games that keep graphics in [ScalabilityGroups] (0 = low ... 3 = epic).
+$UnrealPresets = [ordered]@{
+    'Competitive' = @{
+        Desc = 'Low shadows, effects, post-processing, foliage, reflections and lighting for a clean, high-FPS picture. View distance and textures stay as you set them so far-away players remain visible. V-Sync off.'
+        Settings = @{ 'ScalabilityGroups' = @{ 'sg.ShadowQuality' = '0'; 'sg.GlobalIlluminationQuality' = '0'; 'sg.ReflectionQuality' = '0'; 'sg.PostProcessQuality' = '0'
+            'sg.EffectsQuality' = '0'; 'sg.FoliageQuality' = '0'; 'sg.ShadingQuality' = '0' } }
+    }
+    'Max FPS' = @{
+        Desc = 'Every graphics setting on its lowest level, including textures, view distance and anti-aliasing. For weaker PCs or the highest frame rate.'
+        Settings = @{ 'ScalabilityGroups' = @{ 'sg.ShadowQuality' = '0'; 'sg.GlobalIlluminationQuality' = '0'; 'sg.ReflectionQuality' = '0'; 'sg.PostProcessQuality' = '0'
+            'sg.EffectsQuality' = '0'; 'sg.FoliageQuality' = '0'; 'sg.ShadingQuality' = '0'; 'sg.ViewDistanceQuality' = '0'; 'sg.TextureQuality' = '0'
+            'sg.AntiAliasingQuality' = '0'; 'sg.LandscapeQuality' = '0' } }
+    }
+    'Balanced' = @{
+        Desc = 'High textures and epic view distance with medium effects - good looking but responsive. V-Sync off.'
+        Settings = @{ 'ScalabilityGroups' = @{ 'sg.ShadowQuality' = '2'; 'sg.GlobalIlluminationQuality' = '2'; 'sg.ReflectionQuality' = '2'; 'sg.PostProcessQuality' = '1'
+            'sg.EffectsQuality' = '2'; 'sg.FoliageQuality' = '2'; 'sg.ShadingQuality' = '2'; 'sg.ViewDistanceQuality' = '3'; 'sg.TextureQuality' = '2'
+            'sg.AntiAliasingQuality' = '2'; 'sg.LandscapeQuality' = '2' } }
+    }
+}
 $Games = @(
     @{ Id = 'Fortnite'; Name = 'Fortnite'; Format = 'Ini'
         Process = @('FortniteClient-Win64-Shipping', 'FortniteLauncher')
@@ -1120,6 +1140,178 @@ $Games = @(
             }
         }
     }
+    # ---------- Unreal Engine shooters: same [ScalabilityGroups] scale (0 low - 3 epic) ----------
+    @{ Id = 'ArcRaiders'; Name = 'Arc Raiders'; Format = 'Ini'
+        Process = @('PioneerGame', 'PioneerGame-Win64-Shipping')
+        FindConfig = { $p = "$env:LOCALAPPDATA\PioneerGame\Saved\Config\WindowsClient\GameUserSettings.ini"; if (Test-Path $p) { $p } }
+        FindExe = { Get-SteamGameDirs 'Arc Raiders' | ForEach-Object { Get-ChildItem (Join-Path $_ 'PioneerGame\Binaries\Win64') -Filter 'PioneerGame*.exe' -ErrorAction SilentlyContinue } | ForEach-Object FullName }
+        Base = @{ '*' = @{ 'bUseVSync' = 'False'; 'MotionBlurMode' = 'Off' } }
+        Presets = $UnrealPresets
+    }
+    @{ Id = 'Valorant'; Name = 'Valorant'; Format = 'Ini'
+        Process = @('VALORANT-Win64-Shipping', 'VALORANT')
+        FindConfig = { Get-ChildItem "$env:LOCALAPPDATA\VALORANT\Saved\Config\*\Windows\GameUserSettings.ini" -ErrorAction SilentlyContinue | ForEach-Object FullName }
+        FindExe = { }
+        Base = @{ '*' = @{ 'bUseVSync' = 'False' } }
+        Presets = $UnrealPresets
+    }
+    @{ Id = 'MarvelRivals'; Name = 'Marvel Rivals'; Format = 'Ini'
+        Process = @('Marvel-Win64-Shipping', 'Marvel')
+        FindConfig = { $p = "$env:LOCALAPPDATA\Marvel\Saved\Config\Windows\GameUserSettings.ini"; if (Test-Path $p) { $p } }
+        FindExe = { }
+        Base = @{ '*' = @{ 'bUseVSync' = 'False' } }
+        Presets = $UnrealPresets
+    }
+    @{ Id = 'TheFinals'; Name = 'The Finals'; Format = 'Ini'
+        Process = @('Discovery')
+        FindConfig = { $p = "$env:LOCALAPPDATA\Discovery\Saved\Config\WindowsClient\GameUserSettings.ini"; if (Test-Path $p) { $p } }
+        FindExe = { }
+        Base = @{ '*' = @{ 'bUseVSync' = 'False'; 'MotionBlurMode' = 'Off' } }
+        Presets = $UnrealPresets
+    }
+
+    # ---------- Satisfactory: keeps its real values as ("sg.X", n) pairs and copies them into [ScalabilityGroups] ----------
+    @{ Id = 'Satisfactory'; Name = 'Satisfactory'; Format = 'Ini'
+        Process = @('FactoryGameSteam-Win64-Shipping', 'FactoryGameEGS-Win64-Shipping', 'FactoryGame-Win64-Shipping')
+        FindConfig = { $p = "$env:LOCALAPPDATA\FactoryGame\Saved\Config\Windows\GameUserSettings.ini"; if (Test-Path $p) { $p } }
+        FindExe = { Get-SteamGameDirs 'Satisfactory' | ForEach-Object { Join-Path $_ 'Engine\Binaries\Win64\FactoryGameSteam-Win64-Shipping.exe' } | Where-Object { Test-Path -LiteralPath $_ } }
+        Base = @{ '*' = @{ 'bUseVSync' = 'False' } }
+        Presets = [ordered]@{
+            'Max FPS' = @{
+                Desc = 'Lowest shadows, effects, post-processing, foliage, clouds and lights, short view and foliage distance. Best for big factories that drop FPS.'
+                Settings = $(
+                    $low = @{ 'sg.ShadowQuality' = '0'; 'sg.EffectsQuality' = '0'; 'sg.PostProcessQuality' = '0'; 'sg.FoliageQuality' = '0'; 'sg.ViewDistanceQuality' = '0'; 'sg.AntiAliasingQuality' = '0'; 'sg.TextureQuality' = '1' }
+                    @{ 'ScalabilityGroups' = $low.Clone(); 'Tuples' = ($low.Clone() + @{ 'sg.CloudQuality' = '0'; 'sg.PoolLightQuality' = '0'; 'sg.FoliageLoadDistance' = '0' }) }
+                )
+            }
+            'Balanced' = @{
+                Desc = 'Medium-high everything: good looking with steady FPS.'
+                Settings = $(
+                    $mid = @{ 'sg.ShadowQuality' = '2'; 'sg.EffectsQuality' = '2'; 'sg.PostProcessQuality' = '2'; 'sg.FoliageQuality' = '2'; 'sg.ViewDistanceQuality' = '2'; 'sg.AntiAliasingQuality' = '2'; 'sg.TextureQuality' = '2' }
+                    @{ 'ScalabilityGroups' = $mid.Clone(); 'Tuples' = ($mid.Clone() + @{ 'sg.CloudQuality' = '2'; 'sg.PoolLightQuality' = '2'; 'sg.FoliageLoadDistance' = '2' }) }
+                )
+            }
+            'Best Looking' = @{
+                Desc = 'Highest settings for screenshots and strong PCs.'
+                Settings = $(
+                    $high = @{ 'sg.ShadowQuality' = '3'; 'sg.EffectsQuality' = '3'; 'sg.PostProcessQuality' = '3'; 'sg.FoliageQuality' = '3'; 'sg.ViewDistanceQuality' = '3'; 'sg.AntiAliasingQuality' = '3'; 'sg.TextureQuality' = '3' }
+                    @{ 'ScalabilityGroups' = $high.Clone(); 'Tuples' = ($high.Clone() + @{ 'sg.CloudQuality' = '3'; 'sg.PoolLightQuality' = '3'; 'sg.FoliageLoadDistance' = '3' }) }
+                )
+            }
+        }
+    }
+
+    # ---------- Minecraft (Java Edition): options.txt, key:value ----------
+    @{ Id = 'Minecraft'; Name = 'Minecraft (Java)'; Format = 'Colon'
+        Process = @()
+        IsRunning = { [bool](Get-CimInstance Win32_Process -Filter "Name = 'javaw.exe' OR Name = 'java.exe'" -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -match 'minecraft' }) }
+        FindConfig = { $p = "$env:APPDATA\.minecraft\options.txt"; if (Test-Path $p) { $p } }
+        FindExe = { }
+        Base = @{ 'enableVsync' = 'false'; 'maxFps' = '260' }   # 260 = Unlimited
+        Presets = [ordered]@{
+            'Max FPS' = @{
+                Desc = 'Render distance 8, simulation 6, minimal particles, no clouds, smooth lighting or entity shadows, no mipmaps or biome blend. Unlimited FPS, V-Sync off.'
+                Settings = @{ 'renderDistance' = '8'; 'simulationDistance' = '6'; 'ao' = 'false'; 'entityShadows' = 'false'; 'particles' = '2'; 'renderClouds' = '"false"'
+                    'mipmapLevels' = '0'; 'biomeBlendRadius' = '0'; 'entityDistanceScaling' = '0.5'; 'menuBackgroundBlurriness' = '0'; 'improvedTransparency' = 'false' }
+            }
+            'Balanced' = @{
+                Desc = 'Render distance 12, simulation 8, smooth lighting, fast clouds, decreased particles. Unlimited FPS, V-Sync off.'
+                Settings = @{ 'renderDistance' = '12'; 'simulationDistance' = '8'; 'ao' = 'true'; 'entityShadows' = 'true'; 'particles' = '1'; 'renderClouds' = '"fast"'
+                    'mipmapLevels' = '4'; 'biomeBlendRadius' = '2'; 'entityDistanceScaling' = '1.0' }
+            }
+            'Best Looking' = @{
+                Desc = 'Render distance 16, simulation 12, fancy clouds, all particles, smooth biome blending.'
+                Settings = @{ 'renderDistance' = '16'; 'simulationDistance' = '12'; 'ao' = 'true'; 'entityShadows' = 'true'; 'particles' = '0'; 'renderClouds' = '"true"'
+                    'mipmapLevels' = '4'; 'biomeBlendRadius' = '5'; 'entityDistanceScaling' = '1.0' }
+            }
+        }
+    }
+
+    # ---------- Roblox: GlobalBasicSettings_13.xml (graphics slider 1-10, fine level 1-21) ----------
+    @{ Id = 'Roblox'; Name = 'Roblox'; Format = 'XmlNamed'
+        Process = @('RobloxPlayerBeta')
+        FindConfig = { Get-ChildItem "$env:LOCALAPPDATA\Roblox\GlobalBasicSettings_*.xml" -ErrorAction SilentlyContinue | Where-Object Name -notmatch 'Studio' | ForEach-Object FullName }
+        FindExe = { }
+        Base = @{}
+        Presets = [ordered]@{
+            'Max FPS' = @{ Desc = 'Graphics quality 1 of 10 (lowest). Best for low-end PCs and laggy games.'; Settings = @{ 'SavedQualityLevel' = '1'; 'GraphicsQualityLevel' = '1' } }
+            'Balanced' = @{ Desc = 'Graphics quality 5 of 10.'; Settings = @{ 'SavedQualityLevel' = '5'; 'GraphicsQualityLevel' = '10' } }
+            'Best Looking' = @{ Desc = 'Graphics quality 10 of 10 (highest).'; Settings = @{ 'SavedQualityLevel' = '10'; 'GraphicsQualityLevel' = '21' } }
+        }
+    }
+
+    # ---------- GTA V (Enhanced and Legacy): settings.xml ----------
+    @{ Id = 'GTAV'; Name = 'GTA V'; Format = 'XmlValue'
+        Process = @('GTA5_Enhanced', 'GTA5_Enhanced_BE', 'GTA5', 'PlayGTAV')
+        FindConfig = {
+            $docs = [Environment]::GetFolderPath('MyDocuments')
+            foreach ($d in 'GTAV Enhanced', 'GTA V') { $p = Join-Path $docs "Rockstar Games\$d\settings.xml"; if (Test-Path -LiteralPath $p) { $p } }
+        }
+        FindExe = {
+            foreach ($d in @(Get-EpicGameDirs 'Grand Theft Auto V Enhanced') + @(Get-EpicGameDirs 'Grand Theft Auto V') + @(Get-SteamGameDirs 'Grand Theft Auto V Enhanced') + @(Get-SteamGameDirs 'Grand Theft Auto V')) {
+                foreach ($e in 'GTA5_Enhanced.exe', 'GTA5.exe') { $p = Join-Path $d $e; if (Test-Path -LiteralPath $p) { $p } }
+            }
+        }
+        Base = @{ 'VSync' = '0'; 'MotionBlurStrength' = '0.000000'; 'DoF' = '0' }
+        Presets = [ordered]@{
+            'Max FPS' = @{
+                Desc = 'Normal textures, shaders, water, grass, particles and reflections, lowest shadows, no tessellation, fog volumes or long shadows, and less traffic and people (easier on the CPU).'
+                Settings = @{ 'ShadowQuality' = '1'; 'ReflectionQuality' = '0'; 'TextureQuality' = '0'; 'ParticleQuality' = '0'; 'WaterQuality' = '0'; 'GrassQuality' = '0'
+                    'ShaderQuality' = '0'; 'Tessellation' = '0'; 'PostFX' = '0'; 'SSAOType' = '0'; 'Shadow_SoftShadows' = '0'; 'Shadow_ParticleShadows' = 'false'
+                    'Shadow_LongShadows' = 'false'; 'Lighting_FogVolumes' = 'false'; 'CityDensity' = '0.500000'; 'PedVarietyMultiplier' = '0.500000'; 'VehicleVarietyMultiplier' = '0.500000' }
+            }
+            'Balanced' = @{
+                Desc = 'High shadows, textures and shaders with normal extras - a good mix for most PCs.'
+                Settings = @{ 'ShadowQuality' = '2'; 'ReflectionQuality' = '1'; 'TextureQuality' = '1'; 'ParticleQuality' = '1'; 'WaterQuality' = '1'; 'GrassQuality' = '1'
+                    'ShaderQuality' = '1'; 'Tessellation' = '1'; 'PostFX' = '1'; 'Shadow_ParticleShadows' = 'true'; 'Shadow_LongShadows' = 'true'; 'Lighting_FogVolumes' = 'true'
+                    'CityDensity' = '0.800000'; 'PedVarietyMultiplier' = '0.800000'; 'VehicleVarietyMultiplier' = '0.800000' }
+            }
+            'Best Looking' = @{
+                Desc = 'Very high shadows, textures, shaders, water and grass, full traffic and crowds.'
+                Settings = @{ 'ShadowQuality' = '3'; 'ReflectionQuality' = '2'; 'TextureQuality' = '2'; 'ParticleQuality' = '2'; 'WaterQuality' = '2'; 'GrassQuality' = '3'
+                    'ShaderQuality' = '2'; 'Tessellation' = '2'; 'PostFX' = '2'; 'Shadow_ParticleShadows' = 'true'; 'Shadow_LongShadows' = 'true'; 'Lighting_FogVolumes' = 'true'
+                    'CityDensity' = '1.000000'; 'PedVarietyMultiplier' = '1.000000'; 'VehicleVarietyMultiplier' = '1.000000' }
+            }
+        }
+    }
+
+    # ---------- Skyrim Special Edition: SkyrimPrefs.ini. V-Sync is left alone: Skyrim's physics break above 60 FPS. ----------
+    @{ Id = 'SkyrimSE'; Name = 'Skyrim Special Edition'; Format = 'Ini'
+        Process = @('SkyrimSE', 'SkyrimSELauncher')
+        FindConfig = {
+            $docs = [Environment]::GetFolderPath('MyDocuments')
+            foreach ($d in 'Skyrim Special Edition', 'Skyrim Special Edition GOG') { $p = Join-Path $docs "My Games\$d\SkyrimPrefs.ini"; if (Test-Path -LiteralPath $p) { $p } }
+        }
+        FindExe = { Get-SteamGameDirs 'Skyrim Special Edition' | ForEach-Object { Join-Path $_ 'SkyrimSE.exe' } | Where-Object { Test-Path -LiteralPath $_ } }
+        Base = @{}
+        Presets = [ordered]@{
+            'Max FPS' = @{
+                Desc = 'Low shadow resolution and distance, no ambient occlusion, god rays, reflections or tree/land shadows, shorter grass distance.'
+                Settings = @{
+                    'Display' = @{ 'iShadowMapResolution' = '1024'; 'fShadowDistance' = '2000.0000'; 'bSAOEnable' = '0'; 'bVolumetricLightingEnable' = '0'; 'bScreenSpaceReflectionEnabled' = '0'
+                        'bTreesReceiveShadows' = '0'; 'bDrawLandShadows' = '0'; 'iNumFocusShadow' = '1' }
+                    'Grass' = @{ 'fGrassStartFadeDistance' = '1000.0000' }
+                }
+            }
+            'Balanced' = @{
+                Desc = 'Medium shadows with ambient occlusion, god rays and reflections on.'
+                Settings = @{
+                    'Display' = @{ 'iShadowMapResolution' = '2048'; 'fShadowDistance' = '4000.0000'; 'bSAOEnable' = '1'; 'bVolumetricLightingEnable' = '1'; 'bScreenSpaceReflectionEnabled' = '1'
+                        'bTreesReceiveShadows' = '1'; 'bDrawLandShadows' = '1' }
+                    'Grass' = @{ 'fGrassStartFadeDistance' = '3500.0000' }
+                }
+            }
+            'Best Looking' = @{
+                Desc = 'Sharp, long-distance shadows, all effects on, grass and objects drawn far away.'
+                Settings = @{
+                    'Display' = @{ 'iShadowMapResolution' = '4096'; 'fShadowDistance' = '8000.0000'; 'bSAOEnable' = '1'; 'bVolumetricLightingEnable' = '1'; 'bScreenSpaceReflectionEnabled' = '1'
+                        'bTreesReceiveShadows' = '1'; 'bDrawLandShadows' = '1' }
+                    'Grass' = @{ 'fGrassStartFadeDistance' = '7000.0000' }
+                    'LOD' = @{ 'fLODFadeOutMultObjects' = '15.0000'; 'fLODFadeOutMultActors' = '15.0000'; 'fLODFadeOutMultItems' = '10.0000' }
+                }
+            }
+        }
+    }
 )
 
 $GpuPrefKey = 'HKCU:\Software\Microsoft\DirectX\UserGpuPreferences'
@@ -1154,22 +1346,59 @@ function Update-ConfigFile([string]$Path, [string]$Format, [hashtable]$Settings,
     $section = ''
     $changed = 0
     $differ = New-Object System.Collections.Generic.List[string]
+    # Formats:
+    #   Ini      key=value under [sections] ('*' = any section). The pseudo-section 'Tuples' also rewrites
+    #            ("key", value) pairs anywhere in the file (Satisfactory keeps its real settings that way).
+    #   Cfg      key "value"                       (Rust)
+    #   Colon    key:value                         (Minecraft)
+    #   XmlNamed <type name="key">value</type>     (Roblox)
+    #   XmlValue <key value="value" />             (GTA V)
     for ($i = 0; $i -lt $lines.Count; $i++) {
-        if ($Format -eq 'Ini') {
-            if ($lines[$i] -match '^\s*\[(.+)\]\s*$') { $section = $Matches[1]; continue }
-            if ($lines[$i] -notmatch '^\s*([^=;#\s][^=]*?)\s*=(.*)$') { continue }
-            $key = $Matches[1]; $old = $Matches[2]; $want = $null
-            foreach ($s in $section, '*') {
-                if ($Settings.ContainsKey($s) -and $Settings[$s].ContainsKey($key)) { $want = $Settings[$s][$key]; break }
+        $line = $lines[$i]
+        if ($Format -eq 'Ini' -and $Settings.ContainsKey('Tuples')) {
+            foreach ($tk in $Settings['Tuples'].Keys) {
+                $rx = '\("' + [regex]::Escape($tk) + '",\s*([^)]*)\)'
+                $m = [regex]::Match($line, $rx)
+                if (-not $m.Success -or $m.Groups[1].Value.Trim() -ceq [string]$Settings['Tuples'][$tk]) { continue }
+                $line = [regex]::Replace($line, $rx, ('("{0}", {1})' -f $tk, $Settings['Tuples'][$tk]))
+                $changed++; $differ.Add($tk)
             }
-            if ($null -eq $want -or $old -ceq $want) { continue }
-            $lines[$i] = "$key=$want"
-        } else {
-            if ($lines[$i] -notmatch '^\s*(\S+)\s+"(.*)"\s*$') { continue }
-            $key = $Matches[1]; $old = $Matches[2]
-            if (-not $Settings.ContainsKey($key) -or $old -ceq $Settings[$key]) { continue }
-            $lines[$i] = '{0} "{1}"' -f $key, $Settings[$key]
+            $lines[$i] = $line
         }
+        $key = $null; $old = $null; $want = $null; $new = $null
+        switch ($Format) {
+            'Ini' {
+                if ($line -match '^\s*\[(.+)\]\s*$') { $section = $Matches[1]; break }
+                if ($line -notmatch '^\s*([^=;#\s][^=]*?)\s*=(.*)$') { break }
+                $key = $Matches[1]; $old = $Matches[2]
+                foreach ($s in $section, '*') {
+                    if ($Settings.ContainsKey($s) -and $Settings[$s].ContainsKey($key)) { $want = $Settings[$s][$key]; break }
+                }
+                if ($null -ne $want) { $new = "$key=$want" }
+            }
+            'Cfg' {
+                if ($line -notmatch '^\s*(\S+)\s+"(.*)"\s*$') { break }
+                $key = $Matches[1]; $old = $Matches[2]
+                if ($Settings.ContainsKey($key)) { $want = $Settings[$key]; $new = '{0} "{1}"' -f $key, $want }
+            }
+            'Colon' {
+                if ($line -notmatch '^([A-Za-z0-9_.]+):(.*)$') { break }
+                $key = $Matches[1]; $old = $Matches[2]
+                if ($Settings.ContainsKey($key)) { $want = $Settings[$key]; $new = "${key}:$want" }
+            }
+            'XmlNamed' {
+                if ($line -notmatch '^(\s*<(\w+) name="([^"]+)">)([^<]*)(</\2>.*)$') { break }
+                $key = $Matches[3]; $old = $Matches[4]
+                if ($Settings.ContainsKey($key)) { $want = $Settings[$key]; $new = $Matches[1] + $want + $Matches[5] }
+            }
+            'XmlValue' {
+                if ($line -notmatch '^(\s*<([\w.]+) value=")([^"]*)("\s*/>.*)$') { break }
+                $key = $Matches[2]; $old = $Matches[3]
+                if ($Settings.ContainsKey($key)) { $want = $Settings[$key]; $new = $Matches[1] + $want + $Matches[4] }
+            }
+        }
+        if ($null -eq $want -or $old -ceq [string]$want) { continue }
+        $lines[$i] = $new
         $changed++
         $differ.Add($key)
     }
@@ -1179,7 +1408,8 @@ function Update-ConfigFile([string]$Path, [string]$Format, [hashtable]$Settings,
 }
 
 function Test-GameRunning($Game) {
-    if (Get-Process -Name $Game.Process -ErrorAction SilentlyContinue) {
+    $running = if ($Game.IsRunning) { & $Game.IsRunning } else { [bool]($Game.Process -and (Get-Process -Name $Game.Process -ErrorAction SilentlyContinue)) }
+    if ($running) {
         [System.Windows.MessageBox]::Show("Close $($Game.Name) first - games overwrite their settings file when they exit.", $AppName) | Out-Null
         return $true
     }
@@ -1575,6 +1805,7 @@ $xamlText = @'
               </StackPanel>
             </DockPanel>
             <WrapPanel x:Name="GamePanel"/>
+            <TextBlock x:Name="TxtGamesMissing" Style="{StaticResource Muted}" TextWrapping="Wrap" FontSize="12" Margin="2,4,0,0"/>
           </StackPanel>
         </ScrollViewer>
       </TabItem>
@@ -2144,11 +2375,17 @@ foreach ($g in $Games) {
         if ($f) { Start-Process explorer.exe "/select,`"$f`"" } else { Write-Log "$($s.Tag.Name): settings file not found." 'WARN' }
     })
     foreach ($c in $status, $presetRow, $desc, $buttons) { [void]$card.Child.Children.Add($c) }
-    $g.Status = $status; $g.ApplyButton = $apply; $g.RestoreButton = $restore
+    $g.Status = $status; $g.ApplyButton = $apply; $g.RestoreButton = $restore; $g.Card = $card
     [void]$ui.GamePanel.Children.Add($card)
     try { Update-GameStatus $g } catch { $status.Text = "Scan failed: $($_.Exception.Message)" }
 }
-$ui.BtnRescanGames.Add_Click({ foreach ($g in $Games) { Update-GameStatus $g }; Write-Log 'Re-scanned for games.' })
+function Update-GamesVisibility {
+    $missing = @($Games | Where-Object { -not $_.ApplyButton.IsEnabled } | ForEach-Object Name)
+    foreach ($g in $Games) { $g.Card.Visibility = if ($g.ApplyButton.IsEnabled) { 'Visible' } else { 'Collapsed' } }
+    $ui.TxtGamesMissing.Text = if ($missing) { "Also supported when installed (launch the game once, then Re-scan): $($missing -join ', ')." } else { '' }
+}
+Update-GamesVisibility
+$ui.BtnRescanGames.Add_Click({ foreach ($g in $Games) { Update-GameStatus $g }; Update-GamesVisibility; Write-Log 'Re-scanned for games.' })
 #endregion
 
 #region Actions ---------------------------------------------------------------------------
