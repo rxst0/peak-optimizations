@@ -16,7 +16,7 @@ param(
 
 #region Bootstrap ---------------------------------------------------------------
 $AppName = 'Peak Optimizations'
-$AppVersion = '1.7.0'
+$AppVersion = '1.8.0'
 
 $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(
     [Security.Principal.WindowsBuiltInRole]::Administrator)
@@ -2111,6 +2111,23 @@ $xamlText = @'
           </StackPanel>
         </ScrollViewer>
       </TabItem>
+
+      <TabItem Header="Discord">
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+          <Border Style="{StaticResource Card}" MaxWidth="640" HorizontalAlignment="Left" Padding="24">
+            <StackPanel>
+              <TextBlock Text="Join the Peak Optimizations Discord" FontSize="20" FontWeight="SemiBold" Margin="0,0,0,8"/>
+              <TextBlock Style="{StaticResource Muted}" TextWrapping="Wrap" FontSize="14" Margin="0,0,0,16"
+                Text="Get help with the app, share your FPS results, suggest new games and features, and hear about new versions first."/>
+              <WrapPanel Margin="-4,0,0,12">
+                <Button x:Name="BtnDiscordJoin" Content="Join the Discord" Background="#5865F2" Foreground="White" FontWeight="SemiBold" FontSize="14" Padding="22,10"/>
+                <Button x:Name="BtnDiscordCopy" Content="Copy Invite Link" Padding="16,10"/>
+              </WrapPanel>
+              <TextBox x:Name="TxtDiscordLink" IsReadOnly="True" Padding="8,6" FontFamily="Consolas"/>
+            </StackPanel>
+          </Border>
+        </ScrollViewer>
+      </TabItem>
     </TabControl>
 
     <Border Grid.Row="2" Style="{StaticResource Card}" Margin="0,6,0,0" Padding="12,8">
@@ -2981,6 +2998,17 @@ $ui.BtnUpdSecurity.Add_Click({ Start-PeakJob -Title 'Updates: security only' -Pa
 $ui.BtnUpdDisable.Add_Click({
     $ok = [System.Windows.MessageBox]::Show("This stops ALL Windows updates, including security patches.`n`nContinue?", $AppName, 'YesNo', 'Warning')
     if ($ok -eq 'Yes') { Start-PeakJob -Title 'Updates: disable all' -Params @{ UpdateMode = 'Disable' } -Script $updateScript }
+})
+
+# Discord
+$DiscordInvite = 'https://discord.gg/C4junEJ6mk'
+$ui.TxtDiscordLink.Text = $DiscordInvite
+$ui.BtnDiscordJoin.Add_Click({
+    try { Start-Process $DiscordInvite } catch { Write-Log "Could not open the browser: $($_.Exception.Message)" 'ERROR' }
+})
+$ui.BtnDiscordCopy.Add_Click({
+    try { [System.Windows.Clipboard]::SetText($DiscordInvite); $ui.BtnDiscordCopy.Content = 'Copied!'; Write-Log 'Discord invite link copied.' }
+    catch { Write-Log "Could not copy the link: $($_.Exception.Message)" 'ERROR' }
 })
 
 # Log / window

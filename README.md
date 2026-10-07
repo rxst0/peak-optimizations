@@ -14,6 +14,10 @@ Running the installer again updates it; your settings, tweak backups and macros 
 
 **Without installing:** double-click `Launch Peak Optimizations.bat` instead.
 
+## Community
+
+Join the Discord: **https://discord.gg/C4junEJ6mk**
+
 ## Tabs
 
 | Tab | What it does |
@@ -29,6 +33,7 @@ Running the installer again updates it; your settings, tweak backups and macros 
 | **Drivers** | Detects your graphics card(s) and motherboard, shows driver/BIOS version and age, and links straight to the official driver page for your exact model (AMD Radeon RX and AMD chipset pages are model-specific). Scans Windows Update for drivers matched to your hardware and installs the ones you pick |
 | **Config** | Windows features (.NET 3.5, Hyper-V, WSL, Sandbox…), fixes (network reset, Windows Update reset, DISM+SFC, component cleanup, winget reset), DNS switcher, legacy control panels |
 | **Updates** | Security-only (recommended), Default, or Disable all |
+| **Discord** | Join the community server for help, FPS results, game requests and update news |
 
 **Export/Import Config** saves your app, tweak and feature selections to JSON so you can reuse them on another PC.
 
