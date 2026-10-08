@@ -10,7 +10,7 @@ One PowerShell file (~267 KB) plus a tiny installer, no dependencies — it uses
 
 That's it — search **"Peak"** in the Start menu to open it (there's a desktop shortcut too).
 It installs to `C:\Program Files\Peak Optimizations`, appears in **Settings › Apps**, and can be uninstalled from there.
-Running the installer again updates it; your settings, tweak backups and macros are kept.
+Installing a new version replaces the old one completely: the old program files are removed, and older Peak Optimizations downloads (zips and extracted folders in Downloads, Desktop and Documents) are deleted after asking. Your settings, tweak backups and macros are kept.
 
 **Without installing:** double-click `Launch Peak Optimizations.bat` instead.
 

@@ -54,14 +54,39 @@ try {
     $files = 'PeakOptimizations.ps1', 'PeakOptimizations.ico', 'Launcher.cs', 'Uninstall.ps1', 'README.md'
     foreach ($f in $files) { if (-not (Test-Path (Join-Path $src $f))) { throw "$f is missing next to Install.ps1. Extract the whole zip and run the installer from there." } }
     $version = if ((Get-Content (Join-Path $src 'PeakOptimizations.ps1') -Raw) -match "\`$AppVersion = '([^']+)'") { $Matches[1] } else { '0.0.0' }
-    Write-Host "  Version $version  ->  $dest"
+    # The previous install (even one in another folder) is replaced, never left alongside the new one.
+    $previous = $null; $previousDir = $null
+    if (Test-Path $uninstallKey) { $k = Get-ItemProperty $uninstallKey; $previous = $k.DisplayVersion; $previousDir = $k.InstallLocation }
+    if ($previous -and $previous -ne $version) { Write-Host "  Updating $previous  ->  $version   ($dest)" }
+    elseif ($previous) { Write-Host "  Reinstalling $version   ($dest)" } else { Write-Host "  Version $version  ->  $dest" }
     Write-Host ''
+
+    # A folder only counts as Peak Optimizations if it has the app in it and isn't a development copy (git repository).
+    function Test-PeakFolder([string]$Dir) {
+        $Dir -and (Test-Path -LiteralPath (Join-Path $Dir 'PeakOptimizations.ps1')) -and -not (Test-Path -LiteralPath (Join-Path $Dir '.git'))
+    }
+    function Test-SameFolder([string]$A, [string]$B) {
+        if (-not $A -or -not $B -or -not (Test-Path -LiteralPath $A) -or -not (Test-Path -LiteralPath $B)) { return $false }
+        (Resolve-Path -LiteralPath $A).Path.TrimEnd('\') -ieq (Resolve-Path -LiteralPath $B).Path.TrimEnd('\')
+    }
 
     # An open copy would keep the old files in use.
     $running = @(Get-CimInstance Win32_Process -Filter "Name = 'powershell.exe'" -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -match 'PeakOptimizations\.ps1' -and $_.ProcessId -ne $PID })
     if ($running -and -not $SandboxRoot) {
         if (Ask "$AppName is open. Close it to continue?" $true) { $running | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue } }
         else { throw 'Setup cancelled - close the app and run setup again.' }
+    }
+
+    # Remove the old version completely so no leftover files from it stay behind.
+    if ($previousDir -and -not (Test-SameFolder $previousDir $dest) -and -not (Test-SameFolder $previousDir $src) -and (Test-PeakFolder $previousDir)) {
+        Step "Removing the old install in $previousDir"
+        Remove-Item -LiteralPath $previousDir -Recurse -Force -ErrorAction SilentlyContinue
+    }
+    if ((Test-Path -LiteralPath $dest) -and -not (Test-SameFolder $dest $src)) {
+        Step $(if ($previous) { "Removing version $previous" } else { 'Clearing the old program folder' })
+        Get-ChildItem -LiteralPath $dest -Force | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+        $left = @(Get-ChildItem -LiteralPath $dest -Force -ErrorAction SilentlyContinue)
+        if ($left) { throw "Some old files are still in use ($(($left | ForEach-Object Name) -join ', ')). Close Peak Optimizations and run setup again." }
     }
 
     Step 'Copying files'
@@ -133,8 +158,48 @@ try {
     foreach ($k in 'NoModify', 'NoRepair') { New-ItemProperty -Path $uninstallKey -Name $k -Value 1 -PropertyType DWord -Force | Out-Null }
     New-ItemProperty -Path $uninstallKey -Name 'EstimatedSize' -Value $sizeKb -PropertyType DWord -Force | Out-Null
 
+    # Keep auto-clean working: point its scheduled task at the new program.
+    if (-not $SandboxRoot -and $built) {
+        $taskArgs = @{ TaskName = 'Peak Optimizations Auto-Clean'; TaskPath = '\Peak Optimizations\' }
+        if (Get-ScheduledTask @taskArgs -ErrorAction SilentlyContinue) {
+            Set-ScheduledTask @taskArgs -Action (New-ScheduledTaskAction -Execute $exe -Argument '-AutoClean' -WorkingDirectory $dest) | Out-Null
+            Step 'Auto-clean now uses the new version'
+        }
+    }
+
+    # Older downloads of the app (zips and extracted folders) are deleted so only the new version is left.
+    $roots = if ($SandboxRoot) { @(Join-Path $SandboxRoot 'Downloads') }
+             else { @((Join-Path $env:USERPROFILE 'Downloads'), [Environment]::GetFolderPath('Desktop'), [Environment]::GetFolderPath('MyDocuments')) }
+    $old = @(foreach ($root in $roots | Where-Object { $_ -and (Test-Path -LiteralPath $_) } | Select-Object -Unique) {
+        Get-ChildItem -LiteralPath $root -Filter 'PeakOptimizations-v*.zip' -File -ErrorAction SilentlyContinue | ForEach-Object {
+            if ($_.Name -match '-v(\d+(\.\d+){1,3})\.zip$' -and [version]$Matches[1] -lt [version]$version) { [pscustomobject]@{ Path = $_.FullName; Version = $Matches[1]; Kind = 'zip' } }
+        }
+        Get-ChildItem -LiteralPath $root -Filter 'PeakOptimizations.ps1' -File -Recurse -Depth 3 -ErrorAction SilentlyContinue | ForEach-Object {
+            $dir = $_.DirectoryName
+            if (-not (Test-PeakFolder $dir) -or (Test-SameFolder $dir $src) -or (Test-SameFolder $dir $dest)) { return }
+            $v = if ((Get-Content -LiteralPath $_.FullName -Raw) -match "\`$AppVersion = '([^']+)'") { $Matches[1] } else { $null }
+            if ($v -and [version]$v -lt [version]$version) { [pscustomobject]@{ Path = $dir; Version = $v; Kind = 'folder' } }
+        }
+    })
+    if ($old) {
+        Write-Host ''
+        Write-Host '  Older downloads of Peak Optimizations:'
+        foreach ($o in $old) { Write-Host "    v$($o.Version)   $($o.Path)" }
+        if (Ask 'Delete these old versions?' $true) {
+            foreach ($o in $old) {
+                Remove-Item -LiteralPath $o.Path -Recurse -Force -ErrorAction SilentlyContinue
+                # Also remove the now-empty folder the zip was extracted into (e.g. PeakOptimizations-v1.7.0).
+                $parent = Split-Path $o.Path -Parent
+                if ($o.Kind -eq 'folder' -and (Split-Path $parent -Leaf) -like 'PeakOptimizations-v*' -and -not (Get-ChildItem -LiteralPath $parent -Force -ErrorAction SilentlyContinue)) {
+                    Remove-Item -LiteralPath $parent -Force -ErrorAction SilentlyContinue
+                }
+            }
+            Step "Deleted $($old.Count) old download(s)"
+        }
+    }
+
     Write-Host ''
-    Write-Host "  $AppName $version is installed." -ForegroundColor Green
+    Write-Host "  $AppName $version is installed$(if ($previous -and $previous -ne $version) { " (replaced $previous)" })." -ForegroundColor Green
     Write-Host '  Open it from Start (type "Peak") or from the desktop shortcut.'
     Write-Host '  Uninstall any time from Settings > Apps.'
     Write-Host ''
